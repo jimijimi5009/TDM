@@ -13,11 +13,12 @@ import DataTypeSelector, { DATA_TYPES } from "@/components/DataTypeSelector";
 import { generateData } from "@/lib/dataGenerator";
 
 const DEFAULT_FIELDS: DataField[] = [
-  { id: "1", type: "names", propertyName: "full_name", option: "Full name", checked: true },
-  { id: "2", type: "phone", propertyName: "phone", option: "+1 ###-###-####", checked: true },
-  { id: "3", type: "email", propertyName: "email", option: "Standard", checked: true },
-  { id: "4", type: "currency", propertyName: "currency", option: "USD", checked: true },
-  { id: "5", type: "number", propertyName: "number", option: "1-100", checked: true },
+  { id: "1", type: "names", propertyName: "first_name", option: "First name", checked: true },
+  { id: "2", type: "names", propertyName: "last_name", option: "Last name", checked: true },
+  { id: "3", type: "alphanumeric", propertyName: "subscriber_id", option: "", checked: true },
+  { id: "4", type: "date", propertyName: "date_of_birth", option: "YYYY-MM-DD", checked: true },
+  { id: "5", type: "postal", propertyName: "zip_code", option: "", checked: true },
+  { id: "6", type: "text", propertyName: "plan_name", option: "", checked: true },
 ];
 
 const Index = () => {
