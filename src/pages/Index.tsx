@@ -93,7 +93,7 @@ const Index = () => {
               <span className="w-[180px]">Data Type</span>
               <span className="w-[140px]">Property Name</span>
               <span className="w-[160px]">Options</span>
-              <span className="w-[160px]">Custom Value</span>
+              <span className="w-[160px]">Actual Data</span>
               <span className="ml-auto">Actions</span>
             </div>
             

@@ -94,7 +94,7 @@ const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate }: DataRowProps
       <Input
         value={field.value || ''}
         onChange={(e) => onUpdate(field.id, { value: e.target.value })}
-        placeholder="Custom Value"
+        placeholder="Actual Data"
         className="w-[160px] bg-card"
       />
       
