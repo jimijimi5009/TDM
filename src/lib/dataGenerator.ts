@@ -12,6 +12,7 @@ const LOREM = ["Lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipisc
 const random = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 const randomNum = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 const randomDigits = (n: number) => Array.from({ length: n }, () => randomNum(0, 9)).join("");
+const randomLetters = (n: number) => Array.from({ length: n }, () => random("ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""))).join("");
 
 const generateValue = (field: DataField): string => {
   switch (field.type) {
@@ -45,6 +46,8 @@ const generateValue = (field: DataField): string => {
       return Array.from({ length: 10 }, () => 
         random("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".split(""))
       ).join("");
+    case "subscriber_id":
+      return randomLetters(3) + randomDigits(7);
     case "number": {
       const [min, max] = field.option === "1-1000" ? [1, 1000] : [1, 100];
       return String(randomNum(min, max));

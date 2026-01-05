@@ -10,6 +10,7 @@ const DATA_TYPES = [
   { value: "region", label: "Region", icon: "🗺️" },
   { value: "country", label: "Country", icon: "🌍" },
   { value: "alphanumeric", label: "Alphanumeric", icon: "🔤" },
+  { value: "subscriber_id", label: "Subscriber ID", icon: "🛂" },
   { value: "number", label: "Number Range", icon: "🔢" },
   { value: "currency", label: "Currency", icon: "💰" },
   { value: "date", label: "Date", icon: "📅" },

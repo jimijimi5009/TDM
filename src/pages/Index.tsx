@@ -15,7 +15,7 @@ import { generateData } from "@/lib/dataGenerator";
 const DEFAULT_FIELDS: DataField[] = [
   { id: "1", type: "names", propertyName: "first_name", option: "First name", checked: true },
   { id: "2", type: "names", propertyName: "last_name", option: "Last name", checked: true },
-  { id: "3", type: "alphanumeric", propertyName: "subscriber_id", option: "", checked: true },
+  { id: "3", type: "subscriber_id", propertyName: "subscriber_id", option: "", checked: true },
   { id: "4", type: "date", propertyName: "date_of_birth", option: "YYYY-MM-DD", checked: true },
   { id: "5", type: "postal", propertyName: "zip_code", option: "", checked: true },
   { id: "6", type: "text", propertyName: "plan_name", option: "", checked: true },
