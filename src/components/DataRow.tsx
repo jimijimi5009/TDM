@@ -32,6 +32,15 @@ const OPTIONS_BY_TYPE: Record<string, string[]> = {
   password: ["8 chars", "12 chars", "16 chars"],
 };
 
+const SQL_PROPERTY_NAMES = [
+  "first_name",
+  "last_name",
+  "subscriber_id",
+  "date_of_birth",
+  "zip_code",
+  "plan_name",
+];
+
 const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate }: DataRowProps) => {
   const options = OPTIONS_BY_TYPE[field.type] || [];
   
@@ -56,21 +65,18 @@ const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate }: DataRowProps
         onChange={(type) => onUpdate(field.id, { type, option: OPTIONS_BY_TYPE[type]?.[0] || "" })}
       />
       
-      <Input
-        value={field.propertyName}
-        onChange={(e) => onUpdate(field.id, { propertyName: e.target.value })}
-        placeholder="property_name"
-        className="w-[140px] bg-card"
-      />
+      <Select value={field.propertyName} onValueChange={(propertyName) => onUpdate(field.id, { propertyName })}>
+        <SelectTrigger className="w-[140px] bg-card">
+          <SelectValue placeholder="Property Name" />
+        </SelectTrigger>
+        <SelectContent>
+          {SQL_PROPERTY_NAMES.map((name) => (
+            <SelectItem key={name} value={name}>{name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-      {field.type === 'constant' ? (
-        <Input
-          value={field.value || ''}
-          onChange={(e) => onUpdate(field.id, { value: e.target.value })}
-          placeholder="Enter constant value"
-          className="w-[160px] bg-card"
-        />
-      ) : options.length > 0 ? (
+      {options.length > 0 ? (
         <Select value={field.option} onValueChange={(option) => onUpdate(field.id, { option })}>
           <SelectTrigger className="w-[160px] bg-card">
             <SelectValue placeholder="Select option" />
@@ -84,6 +90,13 @@ const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate }: DataRowProps
       ) : (
         <div className="w-[160px]" />
       )}
+
+      <Input
+        value={field.value || ''}
+        onChange={(e) => onUpdate(field.id, { value: e.target.value })}
+        placeholder="Custom Value"
+        className="w-[160px] bg-card"
+      />
       
       <div className="flex items-center gap-1 ml-auto">
         <Button

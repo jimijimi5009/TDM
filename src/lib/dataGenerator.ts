@@ -64,7 +64,7 @@ const generateValue = (field: DataField): string => {
       return `${year}-${month}-${day}`;
     }
     case "constant":
-      return field.value || "";
+      return ""; // This type is now effectively handled by the custom value input
     case "creditcard":
       return `4${randomDigits(3)}-${randomDigits(4)}-${randomDigits(4)}-${randomDigits(4)}`;
     case "password": {
@@ -83,7 +83,7 @@ export const generateData = (fields: DataField[], rows: number, format: string):
   const data = Array.from({ length: rows }, () => {
     const row: Record<string, string> = {};
     activeFields.forEach(field => {
-      row[field.propertyName || field.type] = generateValue(field);
+      row[field.propertyName || field.type] = field.value ? field.value : generateValue(field);
     });
     return row;
   });
