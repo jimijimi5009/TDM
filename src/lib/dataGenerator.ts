@@ -64,7 +64,7 @@ const generateValue = (field: DataField): string => {
       return `${year}-${month}-${day}`;
     }
     case "constant":
-      return field.propertyName || "constant";
+      return field.value || "";
     case "creditcard":
       return `4${randomDigits(3)}-${randomDigits(4)}-${randomDigits(4)}-${randomDigits(4)}`;
     case "password": {

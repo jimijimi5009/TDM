@@ -11,6 +11,7 @@ interface DataField {
   propertyName: string;
   option: string;
   checked: boolean;
+  value?: string;
 }
 
 interface DataRowProps {
@@ -61,8 +62,15 @@ const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate }: DataRowProps
         placeholder="property_name"
         className="w-[140px] bg-card"
       />
-      
-      {options.length > 0 ? (
+
+      {field.type === 'constant' ? (
+        <Input
+          value={field.value || ''}
+          onChange={(e) => onUpdate(field.id, { value: e.target.value })}
+          placeholder="Enter constant value"
+          className="w-[160px] bg-card"
+        />
+      ) : options.length > 0 ? (
         <Select value={field.option} onValueChange={(option) => onUpdate(field.id, { option })}>
           <SelectTrigger className="w-[160px] bg-card">
             <SelectValue placeholder="Select option" />

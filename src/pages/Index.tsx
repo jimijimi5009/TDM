@@ -53,6 +53,7 @@ const Index = () => {
       propertyName: newFieldType,
       option: "",
       checked: true,
+      value: "",
     };
     setFields(prev => [...prev, newField]);
   }, [newFieldType]);
