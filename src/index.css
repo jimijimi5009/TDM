@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 220 15% 20%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 20%;
+
+    --primary: 38 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 38 100% 97%;
+    --secondary-foreground: 38 100% 40%;
+
+    --muted: 220 10% 96%;
+    --muted-foreground: 220 10% 50%;
+
+    --accent: 38 100% 95%;
+    --accent-foreground: 38 100% 35%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 90%;
+    --input: 220 15% 90%;
+    --ring: 38 100% 50%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Custom tokens */
+    --gradient-primary: linear-gradient(135deg, hsl(38 100% 50%), hsl(45 100% 55%));
+    --shadow-card: 0 2px 8px -2px hsl(220 15% 20% / 0.08);
+    --shadow-elevated: 0 8px 24px -8px hsl(220 15% 20% / 0.12);
+    
+    /* Step indicator colors */
+    --step-bg: 220 15% 94%;
+    --step-text: 220 15% 50%;
+    
+    /* Table header */
+    --table-header: 38 100% 97%;
+    --table-header-text: 38 80% 35%;
+  }
+
+  .dark {
+    --background: 220 20% 10%;
+    --foreground: 0 0% 95%;
+
+    --card: 220 20% 13%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 220 20% 13%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 38 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 38 50% 15%;
+    --secondary-foreground: 38 100% 70%;
+
+    --muted: 220 15% 18%;
+    --muted-foreground: 220 10% 60%;
+
+    --accent: 38 50% 15%;
+    --accent-foreground: 38 100% 70%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 95%;
+
+    --border: 220 15% 20%;
+    --input: 220 15% 20%;
+    --ring: 38 100% 50%;
+    
+    --step-bg: 220 15% 20%;
+    --step-text: 220 10% 60%;
+    
+    --table-header: 38 50% 12%;
+    --table-header-text: 38 100% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .step-badge {
+    @apply w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium;
+    background: hsl(var(--step-bg));
+    color: hsl(var(--step-text));
+  }
+  
+  .data-row {
+    @apply flex items-center gap-4 py-3 border-b border-border/50 last:border-0;
+  }
+  
+  .format-chip {
+    @apply px-4 py-2 rounded-full border-2 cursor-pointer transition-all duration-200;
+  }
+  
+  .format-chip-selected {
+    @apply border-primary bg-primary/10 text-primary;
+  }
+  
+  .format-chip-unselected {
+    @apply border-border bg-card hover:border-primary/50;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
