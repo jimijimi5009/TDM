@@ -62,7 +62,8 @@ app.get('/api/schema', async (req: Request, res: Response) => {
     });
 
     const result = await connection.execute(
-      `SELECT COLUMN_NAME, DATA_TYPE FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = :tableName`,
+      `SELECT COLUMN_NAME, DATA_TYPE, DATA_LENGTH, DATA_PRECISION, DATA_SCALE, NULLABLE
+       FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = :tableName`,
       [(tableName as string).toUpperCase()], // Bind variables - CONVERT TO UPPERCASE
       { outFormat: oracledb.OUT_FORMAT_OBJECT } // Get results as an array of objects
     );
@@ -70,7 +71,11 @@ app.get('/api/schema', async (req: Request, res: Response) => {
     // The result.rows will be an array of objects, e.g., [{COLUMN_NAME: '...', DATA_TYPE: '...'}]
     const schema = result.rows?.map((row: any) => ({
         column_name: row.COLUMN_NAME,
-        data_type: row.DATA_TYPE
+        data_type: row.DATA_TYPE,
+        data_length: row.DATA_LENGTH,
+        data_precision: row.DATA_PRECISION,
+        data_scale: row.DATA_SCALE,
+        is_nullable: row.NULLABLE === 'Y' // Convert 'Y'/'N' to boolean
     }));
 
     res.json({
