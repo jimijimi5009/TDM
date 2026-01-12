@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -11,7 +11,7 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
   res.send('Backend server is running!');
 });
 
@@ -25,7 +25,7 @@ const mockTblPatIntakePlanSchema = [
   { column_name: "LAST_UPDATED", data_type: "date" },
 ];
 
-app.get('/api/schema', (req, res) => {
+app.get('/api/schema', (req: Request, res: Response) => {
   const { environment, tableName } = req.query;
 
   if (tableName === 'tblpatintakeplan') {
