@@ -63,7 +63,7 @@ app.get('/api/schema', async (req: Request, res: Response) => {
 
     const result = await connection.execute(
       `SELECT COLUMN_NAME, DATA_TYPE FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = :tableName`,
-      [tableName as string], // Bind variables
+      [(tableName as string).toUpperCase()], // Bind variables - CONVERT TO UPPERCASE
       { outFormat: oracledb.OUT_FORMAT_OBJECT } // Get results as an array of objects
     );
     
