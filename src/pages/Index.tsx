@@ -28,67 +28,47 @@ const Index = () => {
   const [rowCount, setRowCount] = useState(10);
   const [generatedData, setGeneratedData] = useState<string | null>(null);
   const [newFieldType, setNewFieldType] = useState("names");
-  const [environment, setEnvironment] = useState<string>("Q1"); // New state for environment
-
-  const getOracleConnectionString = useCallback((env: string) => {
-    let hostName: string | null = null;
-    switch (env.toUpperCase()) {
-      case "Q1":
-        hostName = "ccxqat_adhoc";
-        break;
-      case "Q2":
-        hostName = "ccxsup_adhoc";
-        break;
-      case "Q3":
-        hostName = "qa3.legacy.adhoc";
-        break;
-      case "Q4":
-        hostName = "ccxprf_provportal";
-        break;
-      case "Q5":
-        hostName = "qa5.legacy.adhoc";
-        break;
-      case "PROD":
-        hostName = "ccxp_adhoc";
-        break;
-      default:
-        console.error("Unable to get the hostname for Oracle");
-        return "Invalid Environment";
-    }
-
-    if (env.toUpperCase() === "Q1") {
-      return "jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=qa1dbccx-scan)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=" + hostName + ")))";
-    } else if (env.toUpperCase() === "Q2") {
-      return "jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=qa2dbccx-scan.ccx.carecentrix.com)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=" + hostName + ")))";
-    } else if (env.toUpperCase() === "Q4") {
-      return "jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ccxq4host.ccx.carecentrix.com)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=" + hostName + ")))";
-    } else if (env.toUpperCase() === "PROD") {
-      return "jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ccxphost.ccx.carecentrix.com)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=" + hostName + ")))";
-    } else {
-      return "jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST=qdborarac-scan)(PORT=1521)))(CONNECT_DATA=(SERVICE_NAME=" + hostName + ")(GLOBAL_NAME=" + hostName + ")))";
-    }
-  }, []);
+  const [environment, setEnvironment] = useState<string>("Q1");
+  const [tableName, setTableName] = useState<string>("tblpatintakeplan"); // New state for table name
 
   const handleFetchSchema = useCallback(async () => {
+    if (!tableName) {
+      toast({
+        title: "Table Name Required",
+        description: "Please enter a table name to fetch its schema.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
-      const connectionString = getOracleConnectionString(environment);
-      console.log("Simulated Connection String for Debug:", connectionString); // For demonstration
-
       // Call the backend API to get the schema
-      const response = await fetch(`/api/schema?environment=${environment}&tableName=tblpatintakeplan`);
+      const response = await fetch(`/api/schema?environment=${environment}&tableName=${tableName}`);
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
       const result = await response.json();
       console.log("Backend schema response:", result);
 
-      const newFields: DataField[] = result.schema.map((col: { column_name: string; data_type: string; }, index: number) => ({
-        id: `${Date.now()}-${index}`,
-        type: col.data_type.toLowerCase() === 'number' ? 'number' : 'text', // Simple mapping for now
-        propertyName: snakeToCamel(col.column_name),
-        option: "",
-        checked: true,
-      }));
+      const newFields: DataField[] = result.schema.map((col: { column_name: string; data_type: string; }, index: number) => {
+        let type = 'text'; // Default to text
+        if (col.data_type.toLowerCase().includes('date')) {
+          type = 'date';
+        } else if (col.data_type.toLowerCase().includes('number')) {
+          type = 'number';
+        } else if (col.column_name.toLowerCase().includes('name')) {
+          type = 'names';
+        } else if (col.column_name.toLowerCase().includes('email')) {
+          type = 'email';
+        }
+        return {
+          id: `${Date.now()}-${index}`,
+          type: type,
+          propertyName: snakeToCamel(col.column_name),
+          option: "",
+          checked: true,
+        };
+      });
       setFields(newFields);
       toast({
         title: "Schema Loaded",
@@ -102,7 +82,7 @@ const Index = () => {
         variant: "destructive",
       });
     }
-  }, [environment, getOracleConnectionString, toast]); // Add getOracleConnectionString to dependencies
+  }, [environment, tableName, toast]); // Add tableName to dependencies
 
   const updateField = useCallback((id: string, updates: Partial<DataField>) => {
     setFields(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
@@ -171,6 +151,12 @@ const Index = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <Input
+                placeholder="Table Name"
+                value={tableName}
+                onChange={(e) => setTableName(e.target.value)}
+                className="w-[180px] bg-card"
+              />
               <Button onClick={handleFetchSchema} variant="outline" size="sm">
                 Fetch Schema <Database className="h-4 w-4 ml-1" />
               </Button>
@@ -187,7 +173,6 @@ const Index = () => {
               <span className="w-8">All</span>
               <span className="w-[180px]">Data Type</span>
               <span className="w-[140px]">Property Name</span>
-              <span className="w-[160px]">Options</span>
               <span className="w-[160px]">Actual Data</span>
               <span className="ml-auto">Actions</span>
             </div>

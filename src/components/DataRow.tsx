@@ -22,28 +22,7 @@ interface DataRowProps {
   onDuplicate: (id: string) => void;
 }
 
-const OPTIONS_BY_TYPE: Record<string, string[]> = {
-  names: ["Full name", "First name", "Last name"],
-  phone: ["+1 ###-###-####", "+44 #### ######", "###-####"],
-  email: ["Standard", "Corporate", "Random"],
-  currency: ["USD", "EUR", "GBP", "JPY"],
-  date: ["YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"],
-  number: ["1-100", "1-1000", "Custom"],
-  password: ["8 chars", "12 chars", "16 chars"],
-};
-
-const SQL_PROPERTY_NAMES = [
-  "first_name",
-  "last_name",
-  "subscriber_id",
-  "date_of_birth",
-  "zip_code",
-  "plan_name",
-];
-
 const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate }: DataRowProps) => {
-  const options = OPTIONS_BY_TYPE[field.type] || [];
-  
   return (
     <div className="data-row animate-fade-in group">
       <button className="cursor-grab text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity">
@@ -65,38 +44,16 @@ const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate }: DataRowProps
         onChange={(type) => onUpdate(field.id, { type, option: OPTIONS_BY_TYPE[type]?.[0] || "" })}
       />
       
-      <Select value={field.propertyName} onValueChange={(propertyName) => onUpdate(field.id, { propertyName })}>
-        <SelectTrigger className="w-[140px] bg-card">
-          <SelectValue placeholder="Property Name" />
-        </SelectTrigger>
-        <SelectContent>
-          {SQL_PROPERTY_NAMES.map((name) => (
-            <SelectItem key={name} value={name}>{name}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="w-[140px] text-sm text-foreground truncate" title={field.propertyName}>
+        {field.propertyName}
+      </div>
 
-      {options.length > 0 ? (
-        <Select value={field.option} onValueChange={(option) => onUpdate(field.id, { option })}>
-          <SelectTrigger className="w-[160px] bg-card">
-            <SelectValue placeholder="Select option" />
-          </SelectTrigger>
-          <SelectContent>
-            {options.map((opt) => (
-              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <div className="w-[160px]" />
-      )}
+      {/* This is the placeholder for the old "Options" column */}
+      <div className="w-[160px]" />
 
-      <Input
-        value={field.value || ''}
-        onChange={(e) => onUpdate(field.id, { value: e.target.value })}
-        placeholder="Actual Data"
-        className="w-[160px] bg-card"
-      />
+      <div className="w-[160px] text-sm text-muted-foreground truncate" title={field.value}>
+        {field.value || ''}
+      </div>
       
       <div className="flex items-center gap-1 ml-auto">
         <Button
