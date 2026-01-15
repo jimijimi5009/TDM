@@ -11,7 +11,7 @@ import FormatSelector from "@/components/FormatSelector";
 import GeneratedOutput from "@/components/GeneratedOutput";
 import DataTypeSelector, { DATA_TYPES } from "@/components/DataTypeSelector";
 import { generateData } from "@/lib/dataGenerator";
-import { useToast } from "../hooks/use-toast"; // Add this import
+import { useToast } from "../hooks/use-toast";
 
 const DEFAULT_FIELDS: DataField[] = [];
 
@@ -29,7 +29,7 @@ const Index = () => {
   const [generatedData, setGeneratedData] = useState<string | null>(null);
   const [newFieldType, setNewFieldType] = useState("names");
   const [environment, setEnvironment] = useState<string>("Q1");
-  const [tableName, setTableName] = useState<string>("tblpatintakeplan"); // New state for table name
+  const [tableName, setTableName] = useState<string>("tblpatintakeplan");
 
   const handleFetchSchema = useCallback(async () => {
     if (!tableName) {
@@ -41,7 +41,6 @@ const Index = () => {
       return;
     }
     try {
-      // Call the backend API to get the schema
       const response = await fetch(`/api/schema?environment=${environment}&tableName=${tableName}`);
       if (!response.ok) {
         const errorData = await response.json();
@@ -51,7 +50,7 @@ const Index = () => {
       console.log("Backend schema response:", result);
 
       const newFields: DataField[] = result.schema.map((col: { column_name: string; data_type: string; }, index: number) => {
-        let type = 'text'; // Default to text
+        let type = 'text';
         if (col.data_type.toLowerCase().includes('date')) {
           type = 'date';
         } else if (col.data_type.toLowerCase().includes('number')) {
@@ -82,7 +81,7 @@ const Index = () => {
         variant: "destructive",
       });
     }
-  }, [environment, tableName, toast]); // Add tableName to dependencies
+  }, [environment, tableName, toast]);
 
   const updateField = useCallback((id: string, updates: Partial<DataField>) => {
     setFields(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
@@ -135,7 +134,6 @@ const Index = () => {
         </h1>
         
         <div className="space-y-6">
-          {/* Step 1: Data Types */}
           <StepCard step={1} title="Choose the types of data you want">
             <div className="flex items-center gap-4 mb-4">
               <span className="text-sm font-medium text-muted-foreground">Select Environment</span>
@@ -162,7 +160,6 @@ const Index = () => {
               </Button>
             </div>
 
-            {/* Table Header */}
             <div className="flex items-center gap-4 px-4 py-3 rounded-t-lg bg-table-header text-table-header-text text-sm font-medium mb-2">
               <div className="w-4" />
               <Checkbox
@@ -177,7 +174,6 @@ const Index = () => {
               <span className="ml-auto">Actions</span>
             </div>
             
-            {/* Data Rows */}
             <div className="space-y-0 mb-4">
               {fields.map((field, index) => (
                 <DataRow
@@ -191,7 +187,6 @@ const Index = () => {
               ))}
             </div>
             
-            {/* Add More */}
             <div className="flex items-center gap-4 pt-4 border-t border-border">
               <span className="text-sm font-medium text-muted-foreground">Add More</span>
               <Select value={newFieldType} onValueChange={setNewFieldType}>
@@ -215,12 +210,10 @@ const Index = () => {
             </div>
           </StepCard>
 
-          {/* Step 2: Format */}
           <StepCard step={2} title="Choose Data format">
             <FormatSelector value={format} onChange={setFormat} />
           </StepCard>
 
-          {/* Step 3: Row Count */}
           <StepCard step={3} title="Number of Rows">
             <div className="flex items-center gap-4">
               <Input
@@ -238,7 +231,6 @@ const Index = () => {
             </div>
           </StepCard>
 
-          {/* Generated Output */}
           {generatedData && (
             <GeneratedOutput data={generatedData} format={format} />
           )}
