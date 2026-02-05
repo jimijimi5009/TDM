@@ -1,5 +1,5 @@
 import { Database } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { NavLink } from "./NavLink";
 
 const Header = () => {
   return (
@@ -13,7 +13,24 @@ const Header = () => {
           <span className="text-xl font-semibold text-foreground">TestDataMangement</span>
         </div>
         
+        <nav className="flex items-center gap-6">
+          <NavLink
+            to="/"
+            className="text-muted-foreground transition-colors hover:text-foreground"
+            activeClassName="text-foreground font-semibold"
+          >
+            Test Data
+          </NavLink>
+          <NavLink
+            to="/api-call"
+            className="text-muted-foreground transition-colors hover:text-foreground"
+            activeClassName="text-foreground font-semibold"
+          >
+            API Call
+          </NavLink>
+        </nav>
 
+        <div />
       </div>
     </header>
   );
