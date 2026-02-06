@@ -3,19 +3,25 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import oracledb from 'oracledb';
+import fetch from 'node-fetch'; // Import node-fetch for server-side fetch
 
 // Note: The 'oracledb' package may require Oracle Instant Client libraries on the host system.
 // If you encounter errors starting the server, you may need to download them from the Oracle website
 // and configure your system's PATH environment variable.
 // On Windows, you can also use `oracledb.initOracleClient({libDir: 'C:/path/to/your/instantclient'});`
 
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') }); // Load server/.env first
+dotenv.config({ path: path.resolve(__dirname, '../../.env') }); // Load project root .env for external API credentials
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+
+const EXTERNAL_API_BASE_URL = process.env.EXTERNAL_API_BASE_URL || 'http://localhost:8081'; // Default for local testing, set in project root .env
+const API_USER_ID = process.env.API_USER_ID;
+const API_PASSWORD = process.env.API_PASSWORD;
 
 const getOracleConnectionString = (env: string): string => {
     let hostName: string | null = null;
@@ -98,6 +104,64 @@ app.get('/api/schema', async (req: Request, res: Response) => {
   }
 });
 
+
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
+});
+
+app.post('/api/external-call', async (req: Request, res: Response) => {
+  const { apiType, environment, requestBody } = req.body;
+
+  if (!apiType || !environment) {
+    return res.status(400).json({ error: 'apiType and environment are required.' });
+  }
+
+  if (!API_USER_ID || !API_PASSWORD) {
+    return res.status(500).json({ error: 'API_USER_ID or API_PASSWORD not set in environment variables.' });
+  }
+
+  // Determine external API endpoint based on apiType and environment
+  let externalApiPath = '';
+  switch (apiType) {
+    case 'initial':
+      externalApiPath = `/initial-req`;
+      break;
+    case 'cos':
+      externalApiPath = `/cos-req`;
+      break;
+    case 'edit':
+      externalApiPath = `/edit-req`;
+      break;
+    default:
+      return res.status(400).json({ error: 'Invalid apiType.' });
+  }
+
+  // Example: construct URL like EXTERNAL_API_BASE_URL/environment/initial-req
+  // The exact path construction here is an assumption. User might need to adjust it.
+  const externalApiUrl = `${EXTERNAL_API_BASE_URL}/${environment}${externalApiPath}`;
+
+  try {
+    const authHeader = `Basic ${Buffer.from(`${API_USER_ID}:${API_PASSWORD}`).toString('base64')}`;
+
+    const externalApiResponse = await fetch(externalApiUrl, {
+      method: 'POST', // Assuming POST for all these calls for now, based on requestBody
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!externalApiResponse.ok) {
+      const errorData = await externalApiResponse.json();
+      throw new Error(`External API Error: ${externalApiResponse.status} ${externalApiResponse.statusText} - ${errorData.message || ''}`);
+    }
+
+    const data = await externalApiResponse.json();
+    res.json(data);
+
+  } catch (error) {
+    console.error('Error proxying external API call:', error);
+    res.status(500).json({ error: 'Failed to proxy external API call.', details: (error as Error).message });
+  }
 });
