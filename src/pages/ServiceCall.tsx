@@ -34,20 +34,51 @@ const ServiceCall = () => {
     const [isLoading, setIsLoading] = useState(false); // Keep isLoading state
 
     const handleFetchSchema = useCallback(async () => {
-        toast({
-            title: "Fetching Schema",
-            description: `Fetching schema for ${selectedService} in ${environment}... (Logic to be implemented)`,
-        });
-        // Placeholder for actual schema fetching logic
-        setIsLoading(true); // Assuming fetching involves loading state
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-        setIsLoading(false);
-        setFields([]); // Clear existing fields or update with dummy data
-        toast({
-            title: "Schema Fetched",
-            description: "Placeholder schema data loaded.",
-        });
-        // This is where the logic for the Join SQL query and filtering would go
+        if (!selectedService) {
+            toast({
+                title: "Service Type Required",
+                description: "Please select a Service Type to fetch its schema.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setIsLoading(true);
+        setFields([]); // Clear existing fields
+        setDbQueryOutput(null); // Clear previous output
+
+        try {
+            const response = await fetch(`/api/service-schema?environment=${environment}&serviceType=${selectedService}`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            console.log("Backend service schema response:", result);
+
+            if (result.schema && result.schema.length > 0) {
+                setFields(result.schema);
+                toast({
+                    title: "Schema Loaded",
+                    description: `Schema for ${selectedService} from ${environment} loaded.`,
+                });
+            } else {
+                toast({
+                    title: "No Schema Found",
+                    description: `No schema fields returned for ${selectedService} in ${environment}.`,
+                    variant: "destructive",
+                });
+            }
+        } catch (error) {
+            console.error("Failed to fetch service schema:", error);
+            toast({
+                title: "Error",
+                description: `Failed to load service schema: ${error instanceof Error ? error.message : String(error)}`,
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
     }, [environment, selectedService, toast]);
 
     const updateField = useCallback((id: string, updates: Partial<DataField>) => {
@@ -87,15 +118,74 @@ const ServiceCall = () => {
 
 
     const handleExecute = useCallback(async () => {
-        toast({
-            title: "Executing Query",
-            description: `Executing query for selected columns in ${selectedService} in ${environment}... (Logic to be implemented)`,
-        });
+        if (!selectedService) {
+            toast({
+                title: "Service Type Required",
+                description: "Please select a Service Type to execute the query.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        const selectedColumns = fields.filter(f => f.checked).map(f => f.propertyName); // Get propertyName of checked fields
+
+        if (selectedColumns.length === 0) {
+            toast({
+                title: "No Columns Selected",
+                description: "Please select at least one column to execute the query.",
+                variant: "destructive",
+            });
+            return;
+        }
+
         setIsLoading(true);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-        setIsLoading(false);
-        setDbQueryOutput(`Executed query for ${selectedService} with selected columns.`);
-        // This is where the logic for fetching a single row would go
+        setDbQueryOutput(null); // Clear previous output
+
+        try {
+            const response = await fetch('/api/service-execute', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    environment: environment,
+                    serviceType: selectedService,
+                    selectedColumnNames: selectedColumns, // Send selected column propertyNames
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            console.log("Backend service execute response:", result);
+
+            if (result.data) {
+                setDbQueryOutput(JSON.stringify(result.data, null, 2));
+                toast({
+                    title: "Query Executed",
+                    description: `Data fetched for ${selectedService} from ${environment}.`,
+                });
+            } else {
+                setDbQueryOutput("No data found for the selected columns.");
+                toast({
+                    title: "No Data Found",
+                    description: `No data returned for selected columns in ${selectedService} from ${environment}.`,
+                    variant: "destructive",
+                });
+            }
+        } catch (error) {
+            console.error("Failed to execute service query:", error);
+            setDbQueryOutput(JSON.stringify({ error: (error as Error).message }, null, 2));
+            toast({
+                title: "Error",
+                description: `Failed to execute service query: ${error instanceof Error ? error.message : String(error)}`,
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
     }, [environment, selectedService, fields, toast]);
 
     const allChecked = fields.every(f => f.checked);

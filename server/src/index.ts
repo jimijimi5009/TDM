@@ -115,6 +115,10 @@ app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
 });
 
+const snakeToCamel = (str: string) => {
+  return str.toLowerCase().replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+};
+
 app.post('/api/external-call', async (req: Request, res: Response) => {
   const { apiType, environment, requestBody } = req.body;
 
@@ -190,4 +194,148 @@ app.post('/api/external-call', async (req: Request, res: Response) => {
     console.error('Error proxying external API call:', error);
     res.status(500).json({ error: 'Failed to proxy external API call.', details: (error as Error).message });
   }
+});
+
+app.get('/api/service-schema', async (req: Request, res: Response) => {
+    const { environment, serviceType } = req.query;
+
+    if (!environment || !serviceType) {
+        return res.status(400).json({ error: 'environment and serviceType query parameters are required.' });
+    }
+
+    // This is the SQL query provided by the user for "Patient Rest Services"
+    const USER_PROVIDED_SQL_QUERY = `
+SELECT tp.ZIP, tp.DOB, tp.FIRSTNAME, tp.LASTNAME, tpip.INSPHONE, tpip.SUBSCRIBERID
+FROM TBLPATIENT tp
+JOIN TBLPATINTAKEPLAN tpip
+ON tp.PATIENTNUMBER = tpip.PATIENTNUMBER
+WHERE tp.ZIP IS NOT NULL
+AND tp.DOB IS NOT NULL
+AND tp.FIRSTNAME IS NOT NULL
+AND tp.LASTNAME IS NOT NULL
+AND tpip.INSPHONE IS NOT NULL
+AND tpip.SUBSCRIBERID IS NOT NULL
+ORDER BY tp.DOB DESC
+FETCH FIRST 1 ROW ONLY`;
+
+    let connection;
+    try {
+        const connectionString = getOracleConnectionString(environment as string);
+
+        connection = await oracledb.getConnection({
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            connectString: connectionString
+        });
+
+        const result = await connection.execute(
+            USER_PROVIDED_SQL_QUERY,
+            [], // No bind variables for this query
+            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+
+        // The result.rows will be an array of objects, e.g., [{ZIP: '...', DOB: '...'}]
+        // We need to map these to DataField format expected by the frontend
+        const schemaFields = result.metaData?.map((col: { name: string; }, index: number) => {
+            let type = 'text'; // Default type
+            // Infer type based on column name or actual data type (if available from metadata)
+            if (col.name.toLowerCase().includes('date') || col.name.toLowerCase().includes('dob')) {
+                type = 'date';
+            } else if (col.name.toLowerCase().includes('phone') || col.name.toLowerCase().includes('zip') || col.name.toLowerCase().includes('id')) {
+                type = 'text';
+            } else if (col.name.toLowerCase().includes('name')) {
+                type = 'names';
+            }
+
+            return {
+                id: `${index}-${col.name}`, // Unique ID
+                type: type,
+                propertyName: snakeToCamel(col.name),
+                option: "",
+                checked: true, // Default to checked
+            };
+        });
+
+        res.json({
+            environment,
+            serviceType,
+            schema: schemaFields || [],
+        });
+
+    } catch (err) {
+        console.error('Error fetching service schema:', err);
+        res.status(500).json({ error: 'Failed to fetch service schema from database.', details: (err as Error).message });
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (err) {
+                console.error('Error closing database connection:', err);
+            }
+        }
+    }
+});
+
+app.post('/api/service-execute', async (req: Request, res: Response) => {
+    const { environment, serviceType, selectedColumnNames } = req.body;
+
+    if (!environment || !serviceType || !selectedColumnNames || !Array.isArray(selectedColumnNames) || selectedColumnNames.length === 0) {
+        return res.status(400).json({ error: 'environment, serviceType, and selectedColumnNames array are required.' });
+    }
+
+    // Base SQL query structure (FROM, JOIN, WHERE, ORDER BY, FETCH)
+    const BASE_SQL_QUERY_STRUCTURE = `
+FROM TBLPATIENT tp
+JOIN TBLPATINTAKEPLAN tpip
+ON tp.PATIENTNUMBER = tpip.PATIENTNUMBER
+WHERE tp.ZIP IS NOT NULL
+AND tp.DOB IS NOT NULL
+AND tp.FIRSTNAME IS NOT NULL
+AND tp.LASTNAME IS NOT NULL
+AND tpip.INSPHONE IS NOT NULL
+AND tpip.SUBSCRIBERID IS NOT NULL
+ORDER BY tp.DOB DESC
+FETCH FIRST 1 ROW ONLY`;
+
+    // Dynamically construct the SELECT clause based on selectedColumnNames
+    // Ensure column names are safe to use directly in the query to prevent SQL injection
+    // For now, assuming selectedColumnNames only contains valid and expected column identifiers.
+    const selectClause = selectedColumnNames.map((col: string) => col).join(', ');
+    const fullSqlQuery = `SELECT ${selectClause} ${BASE_SQL_QUERY_STRUCTURE}`;
+
+    let connection;
+    try {
+        const connectionString = getOracleConnectionString(environment as string);
+
+        connection = await oracledb.getConnection({
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            connectString: connectionString
+        });
+
+        const result = await connection.execute(
+            fullSqlQuery,
+            [], // No bind variables needed for column names in SELECT clause
+            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+
+        res.json({
+            environment,
+            serviceType,
+            selectedColumns: selectedColumnNames,
+            data: result.rows && result.rows.length > 0 ? result.rows[0] : null, // Return single row
+        });
+
+    } catch (err) {
+        console.error('Error executing service query:', err);
+        res.status(500).json({ error: 'Failed to execute service query.', details: (err as Error).message });
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (err) {
+                console.error('Error closing database connection:', err);
+            }
+        }
+    }
 });
