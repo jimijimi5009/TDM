@@ -28,6 +28,13 @@ const Header = () => {
           >
             API Call
           </NavLink>
+          <NavLink
+            to="/service-call"
+            className="text-muted-foreground transition-colors hover:text-foreground"
+            activeClassName="text-foreground font-semibold"
+          >
+            Service Call
+          </NavLink>
         </nav>
 
         <div />
