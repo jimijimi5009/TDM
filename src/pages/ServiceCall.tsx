@@ -228,6 +228,9 @@ const ServiceCall = () => {
                             <Button onClick={handleFetchSchema} variant="outline" size="sm" disabled={!selectedService}>
                                 Fetch Schema <Database className="h-4 w-4 ml-1" />
                             </Button>
+                            <Button onClick={() => console.log("Create Data button clicked")} variant="outline" size="sm" disabled={!selectedService}>
+                                Create Data <Plus className="h-4 w-4 ml-1" />
+                            </Button>
                         </div>
 
                         <div className="flex items-center gap-4 px-4 py-3 rounded-t-lg bg-table-header text-table-header-text text-sm font-medium mb-2">
