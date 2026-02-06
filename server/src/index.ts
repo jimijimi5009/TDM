@@ -19,9 +19,16 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-const EXTERNAL_API_BASE_URL = process.env.EXTERNAL_API_BASE_URL || 'http://localhost:8081'; // Default for local testing, set in project root .env
 const API_USER_ID = process.env.API_USER_ID;
 const API_PASSWORD = process.env.API_PASSWORD;
+const EXTERNAL_API_DOMAIN_CORE = process.env.EXTERNAL_API_DOMAIN_CORE || 'localhost:8081'; // Default for local testing
+
+const getExternalApiBaseUrl = (env: string): string => {
+    // Assuming the pattern is "https://[env-prefix]-<EXTERNAL_API_DOMAIN_CORE>"
+    // where env comes in as "Q1", "Q2", etc.
+    const envPrefix = env.toLowerCase(); // "q1", "q2"
+    return `https://${envPrefix}-${EXTERNAL_API_DOMAIN_CORE}`;
+};
 
 const getOracleConnectionString = (env: string): string => {
     let hostName: string | null = null;
@@ -80,7 +87,6 @@ app.get('/api/schema', async (req: Request, res: Response) => {
         data_type: row.DATA_TYPE,
         data_length: row.DATA_LENGTH,
         data_precision: row.DATA_PRECISION,
-        data_scale: row.DATA_SCALE,
         is_nullable: row.NULLABLE === 'Y' // Convert 'Y'/'N' to boolean
     }));
 
@@ -120,25 +126,24 @@ app.post('/api/external-call', async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'API_USER_ID or API_PASSWORD not set in environment variables.' });
   }
 
-  // Determine external API endpoint based on apiType and environment
+  // Determine external API path based on apiType
   let externalApiPath = '';
   switch (apiType) {
     case 'initial':
-      externalApiPath = `/initial-req`;
+      externalApiPath = `/cases`; // Path for initial requests, as per user's example
       break;
     case 'cos':
-      externalApiPath = `/cos-req`;
+      externalApiPath = `/cos-path-placeholder`; // Placeholder: User needs to provide the actual path for COS
       break;
     case 'edit':
-      externalApiPath = `/edit-req`;
+      externalApiPath = `/edit-path-placeholder`; // Placeholder: User needs to provide the actual path for Edit
       break;
     default:
       return res.status(400).json({ error: 'Invalid apiType.' });
   }
 
-  // Example: construct URL like EXTERNAL_API_BASE_URL/environment/initial-req
-  // The exact path construction here is an assumption. User might need to adjust it.
-  const externalApiUrl = `${EXTERNAL_API_BASE_URL}/${environment}${externalApiPath}`;
+  const externalApiBaseUrl = getExternalApiBaseUrl(environment as string);
+  const externalApiUrl = `${externalApiBaseUrl}${externalApiPath}`;
 
   try {
     const authHeader = `Basic ${Buffer.from(`${API_USER_ID}:${API_PASSWORD}`).toString('base64')}`;
@@ -152,13 +157,34 @@ app.post('/api/external-call', async (req: Request, res: Response) => {
       body: JSON.stringify(requestBody),
     });
 
-    if (!externalApiResponse.ok) {
-      const errorData = await externalApiResponse.json();
-      throw new Error(`External API Error: ${externalApiResponse.status} ${externalApiResponse.statusText} - ${errorData.message || ''}`);
+    let responseData;
+    const contentType = externalApiResponse.headers.get('content-type');
+
+    if (contentType && contentType.includes('application/json')) {
+      responseData = await externalApiResponse.json();
+    } else {
+      responseData = await externalApiResponse.text();
+      // If it's not JSON, we might want to wrap it in an object for consistency
+      // or just send the raw text. For debugging, sending raw text is useful.
+      console.log('External API responded with non-JSON content:', responseData);
     }
 
-    const data = await externalApiResponse.json();
-    res.json(data);
+    if (!externalApiResponse.ok) {
+      // If the response was not OK, and we parsed JSON, we use that for error details.
+      // Otherwise, we use the raw text or a generic message.
+      const errorMessage = (typeof responseData === 'object' && responseData !== null && 'message' in responseData)
+        ? responseData.message
+        : (typeof responseData === 'string' ? responseData : externalApiResponse.statusText);
+      console.error(`External API Error (${externalApiResponse.status}):`, responseData);
+      return res.status(externalApiResponse.status).json({
+        error: `External API Error: ${externalApiResponse.status} ${externalApiResponse.statusText}`,
+        details: errorMessage,
+        externalResponse: responseData // Include the raw external response for debugging
+      });
+    }
+
+    console.log('External API success response:', responseData);
+    res.json(responseData);
 
   } catch (error) {
     console.error('Error proxying external API call:', error);
