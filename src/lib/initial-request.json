@@ -1,0 +1,284 @@
+{
+  "caseDetails": {
+    "submitterInfo": {
+      "firstName": "vijayapandian",
+      "lastName": "palani",
+      "email": "XYZ@mailslurp.net",
+      "userType": "PROVIDER"
+    },
+    "referralRequestId": "878e0307-a112-49ad-879c-f3a910x95421",
+    "referralRequestLineId": null,
+    "primDiagUpdatedFlag": "N",
+    "referralDetails": {
+      "contactInfo": {
+        "fax": "(234) 242-3423",
+        "firstName": "vijayapandian",
+        "lastName": "palani",
+        "phoneNumber": "(248) 403-2731",
+        "preferredContactMethod": {
+          "gdfId": "CM30"
+        }
+      },
+      "referralMethod": {
+        "gdfId": "17ba0791499db908433b80f37c5fbc89b870084b"
+      },
+      "referralSource": {
+        "gdfId": "da4b9237bacccdf19c0760cab7aec4a8359010b0"
+      }
+    },
+    "member": {
+      "firstName": "NIKI",
+      "lastName": "HUDDS",
+      "subscriberId": "YKZ3HZN88339830",
+      "dob": "1965-01-08",
+      "earliestAuthStartDate": "2026-02-01"
+    },
+    "planDetails": {
+      "healthPlan": "Horizon BCBS NJ",
+      "carrierGdfId": "d8e4bbea3af2e4861ad5a445aaec573e02f9aca2"
+    },
+    "attachments": [],
+    "caseServiceLine": [
+      {
+        "referralRequestLineId": null,
+        "serviceCategory": "INSTAY",
+        "serviceCode": "4282",
+        "routingPriority": "Urgent",
+        "serviceType": "SNF",
+        "hcpcCode": "52",
+        "uom": "IS",
+        "requestedStartDate": "2026-02-01",
+        "requestedEndDate": null,
+        "requestedUnits": null,
+        "templates": [
+          {
+            "templateId": "2354",
+            "templateType": "Common_Template",
+            "questionAndAnswer": [
+              {
+                "questionSourceSystemId": "25701",
+                "questionText": "Request Type",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS1",
+                    "answer": "Urgent"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "25692",
+                "questionText": "Requested Start Date",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS1",
+                    "answer": "2024-02-26"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "25699",
+                "questionText": "Was the service or item for which you are now requesting authorization initiated prior to submitting this request for authorization?",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS3",
+                    "answer": "Yes"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "31348",
+                "questionText": "Was the service or item for which you are requesting authorization completed prior to submitting this request? (I.E. was the member discharged from the post-acute setting)",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS4",
+                    "answer": "No"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "25702",
+                "questionText": "Is there a verbal or written physician's or other qualified licensed practitioner's order for the service you are requesting? (Note: A written order is required prior to billing for services rendered.)",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS3",
+                    "answer": "Yes"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "31144",
+                "questionText": "Was the patient recently discharged from an acute setting?",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS4",
+                    "answer": "No"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "templateId": "99996996",
+            "templateType": "Clinical_Template",
+            "questionAndAnswer": [
+              {
+                "questionSourceSystemId": "32139",
+                "questionText": "Does the patient have acute hospital needs?",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS3",
+                    "answer": "Yes"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "32140",
+                "questionText": "Does the patient have intense and complex care needs that make skilled nursing facility care safer and more practical than a lower level of care?",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS3",
+                    "answer": "Yes"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "32141",
+                "questionText": "Does the care include multiple components delivered by skilled professionals?",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS3",
+                    "answer": "Yes"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "32142",
+                "questionText": "Is there a plan to provide ALL of the following?",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS3",
+                    "answer": "Yes"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "32143",
+                "questionText": "What type of skilled treatments are needed?",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS25",
+                    "answer": "Nursing"
+                  },
+                  {
+                    "answerSourceSystemId": "ANS26",
+                    "answer": "Therapy (PT/OT/ST)"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "32144",
+                "questionText": "What are the nursing interventions being requested? Select all that apply",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS28",
+                    "answer": "Insulin Regimen"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "32145",
+                "questionText": "Select how many hours of nursing per day are required while in the skilled nursing facility?",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS40",
+                    "answer": "2 hours per day"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "32146",
+                "questionText": "What are the therapy interventions being requested? Select all that apply",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS17",
+                    "answer": "Supervision of therapeutic exercises"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "32147",
+                "questionText": "Select how many hours of therapy will be required in the skilled nursing facility:",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS40",
+                    "answer": "2 hours per day"
+                  }
+                ]
+              },
+              {
+                "questionSourceSystemId": "32148",
+                "questionText": "Do you have clinical documentation to support this request, including the answers provided to the questions above (e.g. physician orders, history and physical, letter of medical necessity)?",
+                "answer": [
+                  {
+                    "answerSourceSystemId": "ANS46",
+                    "answer": "Yes documents are attached"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "providers": [
+          {
+            "address": {
+              "line1": "325 HOSPITALITY LANE",
+              "line2": "",
+              "city": "SAN BERNARDINO",
+              "zipCode": "92408",
+              "state": "California"
+            },
+            "copiedFromProviderGdfId": null,
+            "faxNumber": "",
+            "providerGdfId": "09fbab428da26cae5fdaac632d9512ffa8c61ccc",
+            "providerType": "Primary_Physician"
+          },
+          {
+            "address": {
+              "line1": "325 HOSPITALITY LANE",
+              "line2": "",
+              "city": "SAN BERNARDINO",
+              "zipCode": "92408",
+              "state": "California"
+            },
+            "copiedFromProviderGdfId": null,
+            "faxNumber": "",
+            "providerGdfId": "09fbab428da26cae5fdaac632d9512ffa8c61ccc",
+            "providerType": "Ordering_Physician"
+          },
+          {
+            "providerType": "Rendering_Provider",
+            "providerGdfId": "2b1a27d6eaa3d3129128b3b0875d160931b3d82c"
+          }
+        ],
+        "dischargingFacility": {},
+        "diagnosis": [
+          {
+            "diagnosisCode": "H04011",
+            "diagnosisType": "primary",
+            "gdfId": "2c949c10ddaf97d4d4bcc329b7903cff2136303a"
+          }
+        ],
+        "attachments": [],
+        "caseServiceLineNumber": null
+      }
+    ],
+    "referralType": "referral",
+    "diagnosis": [
+      {
+        "diagnosisCode": "H401234",
+        "diagnosisType": "primary",
+        "gdfId": "9ceeaa140dcf1eedff95600d2ca6ac0b4c8754eb"
+      }
+    ]
+  }
+}

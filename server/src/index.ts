@@ -357,6 +357,98 @@ FETCH FIRST 1 ROW ONLY`;
     }
 });
 
+app.post('/api/create-intake-data', async (req: Request, res: Response) => {
+    const { environment, serviceType } = req.body;
+
+    if (!environment || !serviceType) {
+        return res.status(400).json({ error: 'environment and serviceType are required.' });
+    }
+
+    let connection: oracledb.Connection | undefined;
+    try {
+        const connectionString = getOracleConnectionString(environment as string);
+        connection = await oracledb.getConnection({
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            connectString: connectionString
+        });
+
+        const MAX_RETRIES = 50;
+        let success = false;
+        let verificationData: any = null;
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            const patientNumber = generatePatientNumber();
+            const firstName = generateRandomName('FIRST');
+            const lastName = generateRandomName('LAST');
+            const phone = generatePhoneNumber();
+            const dob = generateDob();
+            // Ensure intakeId is highly unique for each attempt
+            const intakeId = Date.now().toString().slice(-7) + String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+
+            try {
+                // Statements are executed individually but commit/rollback is managed manually
+                const insertPatientSql = `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD-MON-YY'))`;
+                await connection.execute(insertPatientSql, [patientNumber, firstName, lastName, phone, dob], { autoCommit: false });
+
+                const insertIntakePlanSql = `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASTNAME, INSPHONE, INSDOB) VALUES (:1, :2, :3, :4, :5, :6, :7, TO_DATE(:8, 'DD-MON-YY'))`;
+                await connection.execute(insertIntakePlanSql, [patientNumber, intakeId, OPERATION_CENTER_CODE, PLAN_LEVEL_CD, firstName, lastName, phone, dob], { autoCommit: false });
+
+                const insertIntakeSql = `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`;
+                await connection.execute(insertIntakeSql, [patientNumber, intakeId, OPERATION_CENTER_CODE], { autoCommit: false });
+
+                // If all inserts succeed, commit the transaction
+                await connection.commit();
+                success = true;
+
+                // Verification Step
+                const verificationSql = `SELECT * FROM TBLPATINTAKEPLAN WHERE PATIENTNUMBER = :1 AND INSFIRSTNAME = :2`;
+                const verifyResult = await connection.execute(verificationSql, [patientNumber, firstName], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+
+                if (verifyResult.rows && verifyResult.rows.length > 0) {
+                    verificationData = verifyResult.rows;
+                }
+                
+                break; // Exit the loop on success
+
+            } catch (err: unknown) {
+                // Rollback transaction on any error
+                if (connection) await connection.rollback();
+
+                // Check if the error is a unique constraint violation (ORA-00001)
+                if ((err as oracledb.DBError).errorNum === 1) {
+                    console.log(`Attempt ${attempt} failed due to unique constraint violation. Retrying...`);
+                    // Continue to the next iteration of the loop
+                } else {
+                    // If it's another type of error, throw it to be caught by the outer catch block
+                    throw err;
+                }
+            }
+        }
+
+        if (success) {
+            res.json({
+                message: 'Intake data created and verified successfully.',
+                data: verificationData,
+            });
+        } else {
+            res.status(500).json({ error: `Failed to create intake data after ${MAX_RETRIES} attempts. The last attempt may have failed due to a unique constraint or another issue.` });
+        }
+
+    } catch (err) {
+        console.error('Error during intake data creation process:', err);
+        res.status(500).json({ error: 'Failed to process intake creation.', details: (err as Error).message });
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (err) {
+                console.error('Error closing database connection:', err);
+            }
+        }
+    }
+});
+
 app.post('/api/service-create', async (req: Request, res: Response) => {
     const { environment, serviceType, dataFields } = req.body;
 

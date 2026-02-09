@@ -1,0 +1,59 @@
+# Backend Logic for "Create Intake Data"
+
+This document outlines the automated process triggered when a user confirms they want to create new intake data.
+
+## 1. Trigger
+
+- The process begins upon receiving a POST request on the `/api/create-intake-data` endpoint.
+- The request body should include the target `environment` (e.g., "Q1") and `serviceType`.
+
+## 2. Main Process: Retry Loop
+
+- The entire operation is wrapped in a loop that will attempt the insertion a maximum of 50 times.
+- This loop is designed to handle potential unique constraint violations, primarily on `INTAKEID`.
+- If the loop finishes all 50 iterations without success, the process fails and returns an error message.
+
+## 3. Inside the Loop: A Single Attempt
+
+Each iteration of the loop represents one attempt to create and insert the data.
+
+### 3.1. Data Generation
+- A new set of random, consistent data is generated. The data must follow the patterns of the sample SQL queries.
+- **Key Fields to Generate:**
+  - `PATIENTNUMBER`: (e.g., a 10-digit string of numbers)
+  - `INTAKEID`: (e.g., a 7-digit string of numbers)
+  - `FIRSTNAME` / `INSFIRSTNAME`: (e.g., a random first name)
+  - `LASTNAME` / `INSLASTNAME`: (e.g., a random last name)
+  - `PHONE` / `INSPHONE`: (e.g., a formatted phone number like (XXX) XXX-XXXX)
+  - `DOB` / `INSDOB`: (e.g., a date formatted as DD-MON-YY)
+  - `OPERATIONCENTERCODE`: (e.g., 'TAMPA')
+  - `PLANLEVELCD`: (e.g., '1')
+- **Consistency Rules:**
+  - `PATIENTNUMBER` must be identical across all generated data.
+  - `INTAKEID` must be identical.
+  - `FIRSTNAME` and `INSFIRSTNAME` must be identical.
+  - `LASTNAME` and `INSLASTNAME` must be identical.
+  - etc.
+
+### 3.2. Database Transaction
+- A database transaction is started to ensure all three insertions are treated as a single atomic operation.
+
+- The following three `INSERT` statements are executed in order, using the data generated in step 3.1:
+  1. `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB) VALUES (...)`
+  2. `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASTNAME, INSPHONE, INSDOB) VALUES (...)`
+  3. `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (...)`
+
+### 3.3. Transaction Outcome
+- **On Success:** If all three `INSERT` statements execute without error, the transaction is committed. The process then moves to the verification step (Step 4). The retry loop is then exited.
+- **On Failure:** If any `INSERT` statement fails (e.g., due to a unique constraint violation on `INTAKEID`), the transaction is immediately rolled back. The current loop iteration ends, and the next one begins (up to the 50-attempt limit).
+
+## 4. Verification Step (Post-Success)
+
+- After a successful commit, a final `SELECT` query is executed to confirm the data was written correctly.
+- `SELECT * FROM TBLPATINTAKEPLAN WHERE PATIENTNUMBER = ? AND INSFIRSTNAME = ?`
+- The `?` placeholders are filled with the `PATIENTNUMBER` and `INSFIRSTNAME` from the data that was just successfully inserted.
+
+## 5. Final Response
+
+- **Success:** The backend returns a 200 OK status with a JSON payload. This payload must contain a success message and the `data` from the verification `SELECT` query. The frontend UI will then parse this data and display it in a table format for the user to see.
+- **Failure:** If the retry loop completes 50 times without success, the backend returns an error status (e.g., 500) with a JSON payload explaining that the operation failed after multiple attempts. This error message will be displayed in the UI.
