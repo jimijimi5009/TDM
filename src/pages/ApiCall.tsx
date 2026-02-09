@@ -3,38 +3,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import Header from "@/components/Header";
-import { Input } from "@/components/ui/input"; // Import Input component
-import { Textarea } from "@/components/ui/textarea"; // Import Textarea component
-import { Button } from "@/components/ui/button"; // Import Button component
-// Removed Accordion imports as it's no longer used for API Response
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 const ApiCall = () => {
-  console.log("ApiCall component rendered");
   const [requestType, setRequestType] = useState("initial");
-  const [dataType, setDataType] = useState("static"); // 'static' or 'custom'
-  const [selectedEnvironment, setSelectedEnvironment] = useState("Q1"); // Default environment
+  const [dataType, setDataType] = useState("static");
+  const [selectedEnvironment, setSelectedEnvironment] = useState("Q1");
 
   useEffect(() => {
-    console.log("requestType changed to:", requestType);
   }, [requestType]);
 
   useEffect(() => {
-    console.log("dataType changed to:", dataType);
   }, [dataType]);
 
-
-  // State for static data fields
   const [referralRequestId, setReferralRequestId] = useState("");
   const [earliestAuthStartDate, setEarliestAuthStartDate] = useState("");
   const [requestedStartDate, setRequestedStartDate] = useState("");
-  const [staticApiResponse, setStaticApiResponse] = useState(""); // New state for static data API response
-  const [showStaticJsonOutput, setShowStaticJsonOutput] = useState(true); // New state for static data output visibility
+  const [staticApiResponse, setStaticApiResponse] = useState("");
+  const [showStaticJsonOutput, setShowStaticJsonOutput] = useState(true);
 
-  // State for custom data fields (API call)
   const [requestBody, setRequestBody] = useState("");
   const [apiResponse, setApiResponse] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingStatic, setIsLoadingStatic] = useState(false); // New state for static data loading
+  const [isLoadingStatic, setIsLoadingStatic] = useState(false);
 
   const handleStaticApiCall = async () => {
     setIsLoadingStatic(true);
@@ -326,7 +319,7 @@ const ApiCall = () => {
       }
     };
 
-    const newJson = JSON.parse(JSON.stringify(staticJsonTemplate)); // Deep copy
+    const newJson = JSON.parse(JSON.stringify(staticJsonTemplate));
     if (newJson.caseDetails) {
       if (referralRequestId) {
         newJson.caseDetails.referralRequestId = referralRequestId;
@@ -352,9 +345,9 @@ const ApiCall = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          apiType: "initial", // For the Initial Request section
+          apiType: "initial",
           environment: selectedEnvironment,
-          requestBody: newJson, // Send the generated JSON as the request body
+          requestBody: newJson,
         }),
       });
 
@@ -365,19 +358,18 @@ const ApiCall = () => {
 
       const data = await response.json();
       setStaticApiResponse(JSON.stringify(data, null, 2));
-    } catch (error: any) {
-      setStaticApiResponse(JSON.stringify({ error: error.message || "An unknown error occurred." }, null, 2));
+    } catch (error: unknown) {
+      setStaticApiResponse(JSON.stringify({ error: (error instanceof Error ? error.message : String(error)) || "An unknown error occurred." }, null, 2));
     } finally {
       setIsLoadingStatic(false);
-      setShowStaticJsonOutput(true); // Always show output after attempt
+      setShowStaticJsonOutput(true);
     }
   };
 
   const handleApiCall = async () => {
     setIsLoading(true);
-    setApiResponse(""); // Clear previous response
+    setApiResponse("");
 
-    // Determine apiType based on the current requestType selection
     let currentApiType = "";
     switch (requestType) {
       case "initial":
@@ -404,7 +396,7 @@ const ApiCall = () => {
         body: JSON.stringify({
           apiType: currentApiType,
           environment: selectedEnvironment,
-          requestBody: JSON.parse(requestBody || "{}"), // Ensure requestBody is a valid JSON object
+          requestBody: JSON.parse(requestBody || "{}"),
         }),
       });
 
@@ -415,8 +407,8 @@ const ApiCall = () => {
 
       const data = await response.json();
       setApiResponse(JSON.stringify(data, null, 2));
-    } catch (error: any) {
-      setApiResponse(JSON.stringify({ error: error.message || "An unknown error occurred." }, null, 2));
+    } catch (error: unknown) {
+      setApiResponse(JSON.stringify({ error: (error instanceof Error ? error.message : String(error)) || "An unknown error occurred." }, null, 2));
     } finally {
       setIsLoading(false);
     }
@@ -443,7 +435,6 @@ const ApiCall = () => {
           </Select>
         </div>
 
-        {/* Content for each request type will be rendered here based on state */}
         <div className="mt-8">
           {requestType === "initial" && (
             <div className="space-y-4">
@@ -460,7 +451,6 @@ const ApiCall = () => {
 
               {dataType === "static" && (
                 <div className="mt-6 p-4 border rounded-lg bg-card-foreground">
-                  {console.log("Rendering Static Data block")}
                   <h3 className="text-xl font-semibold mb-4 text-white">Static Data Configuration</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -507,7 +497,7 @@ const ApiCall = () => {
                   </Button>
 
                   <h3 className="text-xl font-semibold mb-4 text-white">Generated JSON Output</h3>
-                  <div className="space-y-2 relative"> {/* Added relative for copy button positioning */}
+                  <div className="space-y-2 relative">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="staticApiResponse" className="text-white">API Response</Label>
                       <Button
@@ -528,7 +518,7 @@ const ApiCall = () => {
                         className="bg-background text-foreground font-mono resize-y"
                       />
                     )}
-                    {showStaticJsonOutput && staticApiResponse && ( // Display copy button only if there's content and visible
+                    {showStaticJsonOutput && staticApiResponse && (
                       <Button
                         onClick={() => navigator.clipboard.writeText(staticApiResponse)}
                         className="absolute top-2 right-2 bg-primary hover:bg-primary/90 text-primary-foreground p-2 rounded"
@@ -541,7 +531,6 @@ const ApiCall = () => {
               )}
               {dataType === "custom" && (
                 <div className="mt-6 p-4 border rounded-lg bg-card-foreground">
-                  {console.log("Rendering Custom Data block")}
                   <h3 className="text-xl font-semibold mb-4 text-foreground">Custom API Call</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

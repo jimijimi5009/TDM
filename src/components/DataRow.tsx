@@ -20,9 +20,10 @@ interface DataRowProps {
   onUpdate: (id: string, updates: Partial<DataField>) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
+  isCreateMode: boolean;
 }
 
-const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate }: DataRowProps) => {
+const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate, isCreateMode }: DataRowProps) => {
   return (
     <div className="data-row animate-fade-in group">
       <button className="cursor-grab text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity">
@@ -41,7 +42,7 @@ const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate }: DataRowProps
       
       <DataTypeSelector
         value={field.type}
-        onChange={(type) => onUpdate(field.id, { type, option: OPTIONS_BY_TYPE[type]?.[0] || "" })}
+        onChange={(type) => onUpdate(field.id, { type })}
       />
       
       <div className="w-[140px] text-sm text-foreground truncate" title={field.propertyName}>
@@ -51,8 +52,19 @@ const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate }: DataRowProps
       {/* This is the placeholder for the old "Options" column */}
       <div className="w-[160px]" />
 
-      <div className="w-[160px] text-sm text-muted-foreground truncate" title={field.value}>
-        {field.value || ''}
+      <div className="w-[160px]">
+        {isCreateMode ? (
+          <Input
+            value={field.value || ""}
+            onChange={(e) => onUpdate(field.id, { value: e.target.value })}
+            placeholder="Enter value"
+            className="h-8"
+          />
+        ) : (
+          <span className="text-sm text-muted-foreground truncate" title={field.value}>
+            {field.value || ''}
+          </span>
+        )}
       </div>
       
       <div className="flex items-center gap-1 ml-auto">

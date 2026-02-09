@@ -3,15 +3,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import oracledb from 'oracledb';
-import fetch from 'node-fetch'; // Import node-fetch for server-side fetch
+import fetch from 'node-fetch';
 
-// Note: The 'oracledb' package may require Oracle Instant Client libraries on the host system.
-// If you encounter errors starting the server, you may need to download them from the Oracle website
-// and configure your system's PATH environment variable.
-// On Windows, you can also use `oracledb.initOracleClient({libDir: 'C:/path/to/your/instantclient'});`
-
-dotenv.config({ path: path.resolve(__dirname, '../.env') }); // Load server/.env first
-dotenv.config({ path: path.resolve(__dirname, '../../.env') }); // Load project root .env for external API credentials
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -21,12 +16,10 @@ app.use(express.json());
 
 const API_USER_ID = process.env.API_USER_ID;
 const API_PASSWORD = process.env.API_PASSWORD;
-const EXTERNAL_API_DOMAIN_CORE = process.env.EXTERNAL_API_DOMAIN_CORE || 'localhost:8081'; // Default for local testing
+const EXTERNAL_API_DOMAIN_CORE = process.env.EXTERNAL_API_DOMAIN_CORE || 'localhost:8081';
 
 const getExternalApiBaseUrl = (env: string): string => {
-    // Assuming the pattern is "https://[env-prefix]-<EXTERNAL_API_DOMAIN_CORE>"
-    // where env comes in as "Q1", "Q2", etc.
-    const envPrefix = env.toLowerCase(); // "q1", "q2"
+    const envPrefix = env.toLowerCase();
     return `https://${envPrefix}-${EXTERNAL_API_DOMAIN_CORE}`;
 };
 
@@ -82,7 +75,15 @@ app.get('/api/schema', async (req: Request, res: Response) => {
     );
     
     // The result.rows will be an array of objects, e.g., [{COLUMN_NAME: '...', DATA_TYPE: '...'}]
-    const schema = result.rows?.map((row: any) => ({
+    interface OracleColumnMetadata {
+        COLUMN_NAME: string;
+        DATA_TYPE: string;
+        DATA_LENGTH: number;
+        DATA_PRECISION: number | null;
+        DATA_SCALE: number | null;
+        NULLABLE: 'Y' | 'N';
+    }
+    const schema = (result.rows as OracleColumnMetadata[])?.map((row) => ({
         column_name: row.COLUMN_NAME,
         data_type: row.DATA_TYPE,
         data_length: row.DATA_LENGTH,
@@ -103,7 +104,7 @@ app.get('/api/schema', async (req: Request, res: Response) => {
     if (connection) {
       try {
         await connection.close();
-      } catch (err) {
+      } catch (err: unknown) {
         console.error(err);
       }
     }
@@ -119,6 +120,39 @@ const snakeToCamel = (str: string) => {
   return str.toLowerCase().replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 };
 
+const generatePatientNumber = () => {
+  return Array(10).fill(0).map(() => Math.floor(Math.random() * 10)).join('');
+};
+
+const generateRandomName = (prefix: string) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let result = prefix;
+    for (let i = 0; i < 5; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+};
+
+const generatePhoneNumber = () => {
+    const randomDigits = () => Array(3).fill(0).map(() => Math.floor(Math.random() * 10)).join('');
+    return `(${randomDigits()}) ${randomDigits()}-${randomDigits()}`;
+};
+
+const generateDob = () => {
+    const day = String(Math.floor(Math.random() * 28) + 1).padStart(2, '0');
+    const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    const month = monthNames[Math.floor(Math.random() * 12)];
+    const year = String(Math.floor(Math.random() * 30) + 70);
+    return `${day}-${month}-${year}`;
+};
+
+const generateIntakeId = () => {
+    return Date.now().toString().slice(-7) + String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+};
+
+const OPERATION_CENTER_CODE = "TAMPA";
+const PLAN_LEVEL_CD = "1";
+
 app.post('/api/external-call', async (req: Request, res: Response) => {
   const { apiType, environment, requestBody } = req.body;
 
@@ -130,17 +164,16 @@ app.post('/api/external-call', async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'API_USER_ID or API_PASSWORD not set in environment variables.' });
   }
 
-  // Determine external API path based on apiType
   let externalApiPath = '';
   switch (apiType) {
     case 'initial':
-      externalApiPath = `/cases`; // Path for initial requests, as per user's example
+      externalApiPath = `/cases`;
       break;
     case 'cos':
-      externalApiPath = `/cos-path-placeholder`; // Placeholder: User needs to provide the actual path for COS
+      externalApiPath = `/cos-path-placeholder`;
       break;
     case 'edit':
-      externalApiPath = `/edit-path-placeholder`; // Placeholder: User needs to provide the actual path for Edit
+      externalApiPath = `/edit-path-placeholder`;
       break;
     default:
       return res.status(400).json({ error: 'Invalid apiType.' });
@@ -153,7 +186,7 @@ app.post('/api/external-call', async (req: Request, res: Response) => {
     const authHeader = `Basic ${Buffer.from(`${API_USER_ID}:${API_PASSWORD}`).toString('base64')}`;
 
     const externalApiResponse = await fetch(externalApiUrl, {
-      method: 'POST', // Assuming POST for all these calls for now, based on requestBody
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': authHeader,
@@ -168,26 +201,19 @@ app.post('/api/external-call', async (req: Request, res: Response) => {
       responseData = await externalApiResponse.json();
     } else {
       responseData = await externalApiResponse.text();
-      // If it's not JSON, we might want to wrap it in an object for consistency
-      // or just send the raw text. For debugging, sending raw text is useful.
-      console.log('External API responded with non-JSON content:', responseData);
     }
 
     if (!externalApiResponse.ok) {
-      // If the response was not OK, and we parsed JSON, we use that for error details.
-      // Otherwise, we use the raw text or a generic message.
       const errorMessage = (typeof responseData === 'object' && responseData !== null && 'message' in responseData)
         ? responseData.message
         : (typeof responseData === 'string' ? responseData : externalApiResponse.statusText);
-      console.error(`External API Error (${externalApiResponse.status}):`, responseData);
       return res.status(externalApiResponse.status).json({
         error: `External API Error: ${externalApiResponse.status} ${externalApiResponse.statusText}`,
         details: errorMessage,
-        externalResponse: responseData // Include the raw external response for debugging
+        externalResponse: responseData
       });
     }
 
-    console.log('External API success response:', responseData);
     res.json(responseData);
 
   } catch (error) {
@@ -203,7 +229,6 @@ app.get('/api/service-schema', async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'environment and serviceType query parameters are required.' });
     }
 
-    // This is the SQL query provided by the user for "Patient Rest Services"
     const USER_PROVIDED_SQL_QUERY = `
 SELECT tp.ZIP, tp.DOB, tp.FIRSTNAME, tp.LASTNAME, tpip.INSPHONE, tpip.SUBSCRIBERID
 FROM TBLPATIENT tp
@@ -234,11 +259,9 @@ FETCH FIRST 1 ROW ONLY`;
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
 
-        // The result.rows will be an array of objects, e.g., [{ZIP: '...', DOB: '...'}]
-        // We need to map these to DataField format expected by the frontend
-        const schemaFields = result.metaData?.map((col: { name: string; }, index: number) => {
-            let type = 'text'; // Default type
-            // Infer type based on column name or actual data type (if available from metadata)
+
+        const schemaFields = result.metaData?.map((col: oracledb.Metadata<string>, index: number) => {
+            let type = 'text';
             if (col.name.toLowerCase().includes('date') || col.name.toLowerCase().includes('dob')) {
                 type = 'date';
             } else if (col.name.toLowerCase().includes('phone') || col.name.toLowerCase().includes('zip') || col.name.toLowerCase().includes('id')) {
@@ -248,11 +271,11 @@ FETCH FIRST 1 ROW ONLY`;
             }
 
             return {
-                id: `${index}-${col.name}`, // Unique ID
+                id: `${index}-${col.name}`,
                 type: type,
                 propertyName: snakeToCamel(col.name),
                 option: "",
-                checked: true, // Default to checked
+                checked: true,
             };
         });
 
@@ -263,13 +286,12 @@ FETCH FIRST 1 ROW ONLY`;
         });
 
     } catch (err) {
-        console.error('Error fetching service schema:', err);
         res.status(500).json({ error: 'Failed to fetch service schema from database.', details: (err as Error).message });
     } finally {
         if (connection) {
             try {
                 await connection.close();
-            } catch (err) {
+            } catch (err: unknown) {
                 console.error('Error closing database connection:', err);
             }
         }
@@ -283,7 +305,6 @@ app.post('/api/service-execute', async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'environment, serviceType, and selectedColumnNames array are required.' });
     }
 
-    // Base SQL query structure (FROM, JOIN, WHERE, ORDER BY, FETCH)
     const BASE_SQL_QUERY_STRUCTURE = `
 FROM TBLPATIENT tp
 JOIN TBLPATINTAKEPLAN tpip
@@ -297,11 +318,51 @@ AND tpip.SUBSCRIBERID IS NOT NULL
 ORDER BY tp.DOB DESC
 FETCH FIRST 1 ROW ONLY`;
 
-    // Dynamically construct the SELECT clause based on selectedColumnNames
-    // Ensure column names are safe to use directly in the query to prevent SQL injection
-    // For now, assuming selectedColumnNames only contains valid and expected column identifiers.
     const selectClause = selectedColumnNames.map((col: string) => col).join(', ');
     const fullSqlQuery = `SELECT ${selectClause} ${BASE_SQL_QUERY_STRUCTURE}`;
+
+    let connection;
+    try {
+        const connectionString = getOracleConnectionString(environment as string);
+
+        connection = await oracleddb.getConnection({
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            connectString: connectionString
+        });
+
+        const result = await connection.execute(
+            fullSqlQuery,
+            [],
+            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+
+        res.json({
+            environment,
+            serviceType,
+            selectedColumns: selectedColumnNames,
+            data: result.rows && result.rows.length > 0 ? result.rows[0] : null,
+        });
+
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to execute service query.', details: (err as Error).message });
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (err: unknown) {
+                console.error('Error closing database connection:', err);
+            }
+        }
+    }
+});
+
+app.post('/api/service-create', async (req: Request, res: Response) => {
+    const { environment, serviceType, dataFields } = req.body;
+
+    if (!environment || !serviceType || !dataFields || !Array.isArray(dataFields)) {
+        return res.status(400).json({ error: 'environment, serviceType, and dataFields array are required.' });
+    }
 
     let connection;
     try {
@@ -313,28 +374,74 @@ FETCH FIRST 1 ROW ONLY`;
             connectString: connectionString
         });
 
-        const result = await connection.execute(
-            fullSqlQuery,
-            [], // No bind variables needed for column names in SELECT clause
-            { outFormat: oracledb.OUT_FORMAT_OBJECT }
-        );
+        let patientNumber = '';
+        let firstName = '';
+        let lastName = '';
+        let phone = '';
+        let dob = '';
+        let intakeId = '';
+
+        const MAX_RETRIES = 5;
+        let retryCount = 0;
+        let success = false;
+        let verificationResult: { PATIENTNUMBER: string; INTAKEID: string; OPERATIONCENTERCODE: string; } | null = null;
+
+        while (retryCount < MAX_RETRIES && !success) {
+            patientNumber = generatePatientNumber();
+            firstName = generateRandomName('FIRST');
+            lastName = generateRandomName('LAST');
+            phone = generatePhoneNumber();
+            dob = generateDob();
+            intakeId = generateIntakeId();
+
+            try {
+                await connection.beginTransaction();
+
+                const insertPatientSql = `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB) VALUES (:1, :2, :3, :4, :5)`;
+                await connection.execute(insertPatientSql, [patientNumber, firstName, lastName, phone, dob], { autoCommit: false });
+
+                const insertIntakePlanSql = `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASNAME, INSPHONE, INSDOB) VALUES (:1, :2, :3, :4, :5, :6, :7, :8)`;
+                await connection.execute(insertIntakePlanSql, [patientNumber, intakeId, OPERATION_CENTER_CODE, PLAN_LEVEL_CD, firstName, lastName, phone, dob], { autoCommit: false });
+
+                const insertIntakeSql = `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`;
+                await connection.execute(insertIntakeSql, [patientNumber, intakeId, OPERATION_CENTER_CODE], { autoCommit: false });
+
+                await connection.commit();
+                success = true;
+
+            } catch (err: unknown) {
+                await connection.rollback();
+                if ((err as oracledb.DBError).errorNum === 1) {
+                    retryCount++;
+                } else {
+                    throw err;
+                }
+            }
+        }
+
+        if (!success) {
+            return res.status(500).json({ error: 'Failed to create intake data after multiple retries due to unique INTAKEID constraint.' });
+        }
+
+        const verificationSql = `SELECT PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE FROM TBLPATINTAKE WHERE PATIENTNUMBER = :1 AND INTAKEID = :2`;
+        const verifyResult = await connection.execute(verificationSql, [patientNumber, intakeId], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+
+        if (verifyResult.rows && verifyResult.rows.length > 0) {
+            verificationResult = verifyResult.rows[0];
+        }
 
         res.json({
-            environment,
-            serviceType,
-            selectedColumns: selectedColumnNames,
-            data: result.rows && result.rows.length > 0 ? result.rows[0] : null, // Return single row
+            message: 'Intake data created and verified successfully.',
+            data: verificationResult,
         });
 
-    } catch (err) {
-        console.error('Error executing service query:', err);
-        res.status(500).json({ error: 'Failed to execute service query.', details: (err as Error).message });
+    } catch (err: unknown) {
+        res.status(500).json({ error: 'Failed to create service data.', details: (err as Error).message });
     } finally {
         if (connection) {
             try {
                 await connection.close();
-            } catch (err) {
-                console.error('Error closing database connection:', err);
+            } catch (err: unknown) {
             }
         }
     }

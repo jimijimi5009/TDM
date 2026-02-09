@@ -24,16 +24,17 @@ const snakeToCamel = (str: string) => {
 };
 
 const ServiceCall = () => {
-    const { toast } = useToast(); // Initialize useToast
+    const { toast } = useToast();
     const [fields, setFields] = useState<DataField[]>([]);
     const [dbQueryOutput, setDbQueryOutput] = useState<string | null>(null);
     const [newFieldType, setNewFieldType] = useState("names");
-    const [environment, setEnvironment] = useState<string>("Q1"); // Keep environment state
-    const [selectedService, setSelectedService] = useState(""); // Keep selectedService state
-    const [dataType, setDataType] = useState("static"); // Keep dataType state
-    const [isLoading, setIsLoading] = useState(false); // Keep isLoading state
+    const [environment, setEnvironment] = useState<string>("Q1");
+    const [selectedService, setSelectedService] = useState("");
+    const [dataType, setDataType] = useState("static");
+    const [isLoading, setIsLoading] = useState(false);
+    const [operationMode, setOperationMode] = useState<"query" | "create">("query");
 
-    const handleFetchSchema = useCallback(async () => {
+    const handleFetchSchema = useCallback(async (mode: "query" | "create" = "query") => {
         if (!selectedService) {
             toast({
                 title: "Service Type Required",
@@ -44,8 +45,9 @@ const ServiceCall = () => {
         }
 
         setIsLoading(true);
-        setFields([]); // Clear existing fields
-        setDbQueryOutput(null); // Clear previous output
+        setFields([]);
+        setDbQueryOutput(null);
+        setOperationMode(mode);
 
         try {
             const response = await fetch(`/api/service-schema?environment=${environment}&serviceType=${selectedService}`);
@@ -54,13 +56,16 @@ const ServiceCall = () => {
                 throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
             }
             const result = await response.json();
-            console.log("Backend service schema response:", result);
-
+            
             if (result.schema && result.schema.length > 0) {
-                setFields(result.schema);
+                const initialFields = result.schema.map((field: DataField) => ({
+                    ...field,
+                    value: field.value || "",
+                }));
+                setFields(initialFields);
                 toast({
                     title: "Schema Loaded",
-                    description: `Schema for ${selectedService} from ${environment} loaded.`,
+                    description: `Schema for ${selectedService} from ${environment} loaded for ${mode} operation.`,
                 });
             } else {
                 toast({
@@ -127,7 +132,7 @@ const ServiceCall = () => {
             return;
         }
 
-        const selectedColumns = fields.filter(f => f.checked).map(f => f.propertyName); // Get propertyName of checked fields
+        const selectedColumns = fields.filter(f => f.checked).map(f => f.propertyName);
 
         if (selectedColumns.length === 0) {
             toast({
@@ -139,7 +144,7 @@ const ServiceCall = () => {
         }
 
         setIsLoading(true);
-        setDbQueryOutput(null); // Clear previous output
+        setDbQueryOutput(null);
 
         try {
             const response = await fetch('/api/service-execute', {
@@ -150,7 +155,7 @@ const ServiceCall = () => {
                 body: JSON.stringify({
                     environment: environment,
                     serviceType: selectedService,
-                    selectedColumnNames: selectedColumns, // Send selected column propertyNames
+                    selectedColumnNames: selectedColumns,
                 }),
             });
 
@@ -159,7 +164,7 @@ const ServiceCall = () => {
                 throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
             }
             const result = await response.json();
-            console.log("Backend service execute response:", result);
+            
 
             if (result.data) {
                 setDbQueryOutput(JSON.stringify(result.data, null, 2));
@@ -190,6 +195,89 @@ const ServiceCall = () => {
 
     const allChecked = fields.every(f => f.checked);
 
+    const handleCreate = useCallback(async () => {
+        if (!selectedService) {
+            toast({
+                title: "Service Type Required",
+                description: "Please select a Service Type to create data.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        const dataToCreate = fields.filter(f => f.checked).map(f => ({
+            propertyName: f.propertyName,
+            value: f.value,
+            type: f.type,
+        }));
+
+        if (dataToCreate.length === 0) {
+            toast({
+                title: "No Data Selected",
+                description: "Please select at least one field and provide values to create data.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        const hasEmptyValues = dataToCreate.some(field => !field.value || String(field.value).trim() === "");
+        if (hasEmptyValues) {
+            toast({
+                title: "Missing Values",
+                description: "Please provide a value for all selected fields.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setIsLoading(true);
+        setDbQueryOutput(null);
+
+        try {
+            const response = await fetch('/api/service-create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    environment: environment,
+                    serviceType: selectedService,
+                    dataFields: dataToCreate,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            
+
+            if (result.message) {
+                setDbQueryOutput(JSON.stringify(result.data || result.message, null, 2));
+                toast({
+                    title: "Data Created",
+                    description: result.message,
+                });
+            } else {
+                setDbQueryOutput("Data created successfully, but no specific message returned.");
+                toast({
+                    title: "Data Created",
+                    description: "Data created successfully.",
+                });
+            }
+        } catch (error) {
+            console.error("Failed to create service data:", error);
+            setDbQueryOutput(JSON.stringify({ error: (error as Error).message }, null, 2));
+            toast({
+                title: "Error",
+                description: `Failed to create service data: ${error instanceof Error ? error.message : String(error)}`,
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [environment, selectedService, fields, toast]);
 
     return (
         <div className="min-h-screen bg-background">
@@ -225,10 +313,10 @@ const ServiceCall = () => {
                                     <SelectItem value="patient-rest-services">Patient Rest Services</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <Button onClick={handleFetchSchema} variant="outline" size="sm" disabled={!selectedService}>
+                            <Button onClick={() => handleFetchSchema("query")} variant="outline" size="sm" disabled={!selectedService}>
                                 Fetch Schema <Database className="h-4 w-4 ml-1" />
                             </Button>
-                            <Button onClick={() => console.log("Create Data button clicked")} variant="outline" size="sm" disabled={!selectedService}>
+                            <Button onClick={() => handleFetchSchema("create")} variant="outline" size="sm" disabled={!selectedService}>
                                 Create Data <Plus className="h-4 w-4 ml-1" />
                             </Button>
                         </div>
@@ -256,43 +344,57 @@ const ServiceCall = () => {
                                     onUpdate={updateField}
                                     onDelete={deleteField}
                                     onDuplicate={duplicateField}
+                                    isCreateMode={operationMode === "create"}
                                 />
                             ))}
                         </div>
                         
-                        <div className="flex items-center gap-4 pt-4 border-t border-border">
-                            <span className="text-sm font-medium text-muted-foreground">Add More</span>
-                            <Select value={newFieldType} onValueChange={setNewFieldType}>
-                                <SelectTrigger className="w-[180px] bg-card">
-                                    <SelectValue placeholder="Select Data Type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {DATA_TYPES.map((type) => (
-                                        <SelectItem key={type.value} value={type.value}>
-                                            <span className="flex items-center gap-2">
-                                                <span>{type.icon}</span>
-                                                <span>{type.label}</span>
-                                            </span>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <Button onClick={addField} variant="outline" size="sm">
-                                Add <Plus className="h-4 w-4 ml-1" />
-                            </Button>
-                        </div>
+                        {operationMode === "create" && (
+                            <div className="flex items-center gap-4 pt-4 border-t border-border">
+                                <span className="text-sm font-medium text-muted-foreground">Add More</span>
+                                <Select value={newFieldType} onValueChange={setNewFieldType}>
+                                    <SelectTrigger className="w-[180px] bg-card">
+                                        <SelectValue placeholder="Select Data Type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {DATA_TYPES.map((type) => (
+                                            <SelectItem key={type.value} value={type.value}>
+                                                <span className="flex items-center gap-2">
+                                                    <span>{type.icon}</span>
+                                                    <span>{type.label}</span>
+                                                </span>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button onClick={addField} variant="outline" size="sm">
+                                    Add <Plus className="h-4 w-4 ml-1" />
+                                </Button>
+                            </div>
+                        )}
                     </StepCard>
 
 
 
-                    <Button
-                        onClick={handleExecute}
-                        disabled={isLoading || !selectedService || fields.filter(f => f.checked).length === 0}
-                        className="w-full bg-blue-500 hover:bg-blue-600 text-primary-foreground py-2 rounded mt-2"
-                    >
-                        {isLoading ? "Executing..." : "Execute"}
-                    </Button>
+                    {operationMode === "query" && (
+                        <Button
+                            onClick={handleExecute}
+                            disabled={isLoading || !selectedService || fields.filter(f => f.checked).length === 0}
+                            className="w-full bg-blue-500 hover:bg-blue-600 text-primary-foreground py-2 rounded mt-2"
+                        >
+                            {isLoading ? "Executing..." : "Execute"}
+                        </Button>
+                    )}
 
+                    {operationMode === "create" && (
+                        <Button
+                            onClick={handleCreate}
+                            disabled={isLoading || !selectedService || fields.filter(f => f.checked).length === 0}
+                            className="w-full bg-green-500 hover:bg-green-600 text-primary-foreground py-2 rounded mt-2"
+                        >
+                            {isLoading ? "Creating..." : "Create Data"}
+                        </Button>
+                    )}
 
                     {dbQueryOutput && (
                         <div className="mt-6 p-4 border rounded-lg bg-card-foreground">
