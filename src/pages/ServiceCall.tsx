@@ -35,7 +35,7 @@ const snakeToCamel = (str: string) => {
 };
 
 const ServiceCall = () => {
-    const { toast } = useToast();
+    const { toast = {} } = useToast(); // Destructure with default empty object for safety
     const [fields, setFields] = useState<DataField[]>([]);
     const [queryOutput, setQueryOutput] = useState<Record<string, any>[] | string | null>(null); // Changed from dbQueryOutput
     const [newFieldType, setNewFieldType] = useState("names");
@@ -297,7 +297,7 @@ const ServiceCall = () => {
         );
     };
 
-    const handleCreate = useCallback(async () => { // Restored original handleCreate
+    const handleCreate = useCallback(async () => { // Original handleCreate
         if (!selectedService) {
             toast({
                 title: "Service Type Required",
@@ -355,7 +355,6 @@ const ServiceCall = () => {
             const result = await response.json();
             
 
-            // --- START Corrected Logic ---
             if (result.message) { // Message received
                 if (result.data) { // If there is data, display it in table format
                     setQueryOutput([result.data]);
@@ -380,8 +379,6 @@ const ServiceCall = () => {
                     description: "Data created successfully.",
                 });
             }
-            // --- END Corrected Logic ---
-
         } catch (error) {
             console.error("Failed to create service data:", error);
             setQueryOutput(JSON.stringify({ error: (error as Error).message }, null, 2));
@@ -394,6 +391,8 @@ const ServiceCall = () => {
             setIsLoading(false);
         }
     }, [environment, selectedService, fields, toast]);
+
+    const allChecked = fields.every(f => f.checked); // <<-- This is the line that needs to move.
 
     return (
         <>
