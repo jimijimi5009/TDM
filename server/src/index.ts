@@ -383,8 +383,8 @@ app.post('/api/create-intake-data', async (req: Request, res: Response) => {
             const lastName = generateRandomName('LAST');
             const phone = generatePhoneNumber();
             const dob = generateDob();
-            // Ensure intakeId is highly unique for each attempt
-            const intakeId = Date.now().toString().slice(-7) + String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+            // Generate a 7-digit intakeId to match the precision of the database column (e.g., 1231231)
+            const intakeId = String(Math.floor(Math.random() * 9000000) + 1000000);
 
             try {
                 // Statements are executed individually but commit/rollback is managed manually
