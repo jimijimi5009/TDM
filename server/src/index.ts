@@ -260,7 +260,7 @@ FETCH FIRST 1 ROW ONLY`;
         );
 
 
-        const schemaFields = result.metaData?.map((col: oracledb.Metadata<string>, index: number) => {
+        const schemaFields = result.metaData?.map((col: oracledb.Metadata<any>, index: number) => {
             let type = 'text';
             if (col.name.toLowerCase().includes('date') || col.name.toLowerCase().includes('dob')) {
                 type = 'date';
@@ -325,7 +325,7 @@ FETCH FIRST 1 ROW ONLY`;
     try {
         const connectionString = getOracleConnectionString(environment as string);
 
-        connection = await oracleddb.getConnection({
+        connection = await oracledb.getConnection({
             user: process.env.DB_USER,
             password: process.env.DB_PASSWORD,
             connectString: connectionString
@@ -395,7 +395,6 @@ app.post('/api/service-create', async (req: Request, res: Response) => {
             intakeId = generateIntakeId();
 
             try {
-                await connection.beginTransaction();
 
                 const insertPatientSql = `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB) VALUES (:1, :2, :3, :4, :5)`;
                 await connection.execute(insertPatientSql, [patientNumber, firstName, lastName, phone, dob], { autoCommit: false });
@@ -427,7 +426,7 @@ app.post('/api/service-create', async (req: Request, res: Response) => {
         const verifyResult = await connection.execute(verificationSql, [patientNumber, intakeId], { outFormat: oracledb.OUT_FORMAT_OBJECT });
 
         if (verifyResult.rows && verifyResult.rows.length > 0) {
-            verificationResult = verifyResult.rows[0];
+            verificationResult = verifyResult.rows[0] as { PATIENTNUMBER: string; INTAKEID: string; OPERATIONCENTERCODE: string; };
         }
 
         res.json({
