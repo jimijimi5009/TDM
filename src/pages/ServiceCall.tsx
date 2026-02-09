@@ -2,15 +2,16 @@ import Header from "@/components/Header";
 import { useState, useCallback } from "react";
 import { Plus, Sparkles, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"; // Re-added
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import StepCard from "@/components/StepCard";
 import DataRow, { DataField } from "@/components/DataRow";
-import DataTypeSelector, { DATA_TYPES } from "@/components/DataTypeSelector"; // Re-added
+import DataTypeSelector, { DATA_TYPES } from "@/components/DataTypeSelector";
+
 import { useToast } from "../hooks/use-toast";
-import { Label } from "@/components/ui/label"; // Re-added
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; // Re-added
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import {
     AlertDialog,
@@ -36,16 +37,16 @@ const snakeToCamel = (str: string) => {
 const ServiceCall = () => {
     const { toast } = useToast();
     const [fields, setFields] = useState<DataField[]>([]);
-    const [queryOutput, setQueryOutput] = useState<Record<string, any>[] | string | null>(null);
-    const [newFieldType, setNewFieldType] = useState("names"); // Re-added
+    const [queryOutput, setQueryOutput] = useState<Record<string, any>[] | string | null>(null); // Changed from dbQueryOutput
+    const [newFieldType, setNewFieldType] = useState("names");
     const [environment, setEnvironment] = useState<string>("Q1");
     const [selectedService, setSelectedService] = useState("");
-    const [dataType, setDataType] = useState("static"); // Re-added
+    const [dataType, setDataType] = useState("static");
     const [isLoading, setIsLoading] = useState(false);
-    const [operationMode, setOperationMode] = useState<"query" | "create">("query"); // Re-added
-    const [isCreateConfirmOpen, setCreateConfirmOpen] = useState(false);
+    const [operationMode, setOperationMode] = useState<"query" | "create">("query");
+    const [isCreateConfirmOpen, setCreateConfirmOpen] = useState(false); // New state
 
-    const handleFetchSchema = useCallback(async (mode: "query" | "create" = "query") => { // Restored mode parameter
+    const handleFetchSchema = useCallback(async (mode: "query" | "create" = "query") => {
         if (!selectedService) {
             toast({
                 title: "Service Type Required",
@@ -57,8 +58,8 @@ const ServiceCall = () => {
 
         setIsLoading(true);
         setFields([]);
-        setQueryOutput(null);
-        setOperationMode(mode); // Restored
+        setQueryOutput(null); // Changed from dbQueryOutput
+        setOperationMode(mode);
 
         try {
             const response = await fetch(`/api/service-schema?environment=${environment}&serviceType=${selectedService}`);
@@ -115,7 +116,7 @@ const ServiceCall = () => {
       });
     }, []);
 
-    const addField = useCallback(() => { // Re-added
+    const addField = useCallback(() => {
       const newField: DataField = {
         id: Date.now().toString(),
         type: newFieldType,
@@ -296,7 +297,7 @@ const ServiceCall = () => {
         );
     };
 
-    const handleCreate = useCallback(async () => { // Restored
+    const handleCreate = useCallback(async () => { // Restored original handleCreate
         if (!selectedService) {
             toast({
                 title: "Service Type Required",
@@ -354,6 +355,7 @@ const ServiceCall = () => {
             const result = await response.json();
             
 
+            // --- START Corrected Logic ---
             if (result.message) { // Message received
                 if (result.data) { // If there is data, display it in table format
                     setQueryOutput([result.data]);
@@ -378,6 +380,8 @@ const ServiceCall = () => {
                     description: "Data created successfully.",
                 });
             }
+            // --- END Corrected Logic ---
+
         } catch (error) {
             console.error("Failed to create service data:", error);
             setQueryOutput(JSON.stringify({ error: (error as Error).message }, null, 2));
