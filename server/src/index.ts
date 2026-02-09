@@ -150,6 +150,14 @@ const generateIntakeId = () => {
     return Date.now().toString().slice(-7) + String(Math.floor(Math.random() * 10000)).padStart(4, '0');
 };
 
+const generateZipCode = () => {
+    return Array(5).fill(0).map(() => Math.floor(Math.random() * 10)).join('');
+};
+
+const generateSubscriberId = () => {
+    return Array(10).fill(0).map(() => Math.floor(Math.random() * 10)).join('');
+};
+
 const OPERATION_CENTER_CODE = "TAMPA";
 const PLAN_LEVEL_CD = "1";
 
@@ -383,16 +391,17 @@ app.post('/api/create-intake-data', async (req: Request, res: Response) => {
             const lastName = generateRandomName('LAST');
             const phone = generatePhoneNumber();
             const dob = generateDob();
-            // Generate a 7-digit intakeId to match the precision of the database column (e.g., 1231231)
-            const intakeId = String(Math.floor(Math.random() * 9000000) + 1000000);
+            const zipCode = generateZipCode(); // Generate ZIP code
+            const subscriberId = generateSubscriberId(); // Generate Subscriber ID
+            const intakeId = String(Math.floor(Math.random() * 9000000) + 1000000); // 7-digit INTAKEID
 
             try {
                 // Statements are executed individually but commit/rollback is managed manually
-                const insertPatientSql = `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD-MON-YY'))`;
-                await connection.execute(insertPatientSql, [patientNumber, firstName, lastName, phone, dob], { autoCommit: false });
+                const insertPatientSql = `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB, ZIP) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD-MON-YY'), :6)`;
+                await connection.execute(insertPatientSql, [patientNumber, firstName, lastName, phone, dob, zipCode], { autoCommit: false });
 
-                const insertIntakePlanSql = `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASTNAME, INSPHONE, INSDOB) VALUES (:1, :2, :3, :4, :5, :6, :7, TO_DATE(:8, 'DD-MON-YY'))`;
-                await connection.execute(insertIntakePlanSql, [patientNumber, intakeId, OPERATION_CENTER_CODE, PLAN_LEVEL_CD, firstName, lastName, phone, dob], { autoCommit: false });
+                const insertIntakePlanSql = `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASTNAME, INSPHONE, INSDOB, SUBSCRIBERID) VALUES (:1, :2, :3, :4, :5, :6, :7, TO_DATE(:8, 'DD-MON-YY'), :9)`;
+                await connection.execute(insertIntakePlanSql, [patientNumber, intakeId, OPERATION_CENTER_CODE, PLAN_LEVEL_CD, firstName, lastName, phone, dob, subscriberId], { autoCommit: false });
 
                 const insertIntakeSql = `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`;
                 await connection.execute(insertIntakeSql, [patientNumber, intakeId, OPERATION_CENTER_CODE], { autoCommit: false });
