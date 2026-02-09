@@ -177,13 +177,21 @@ const ServiceCall = () => {
             const result = await response.json();
             
 
-            if (result.data) { // Changed condition
-                setQueryOutput([result.data]); // Ensure queryOutput is always an array for table rendering
+            if (result.data) { // Data object received
+                setQueryOutput([result.data]); // Ensure queryOutput is always an array of objects for table rendering
                 toast({
                     title: "Query Executed",
                     description: `Data fetched for ${selectedService} from ${environment}.`,
                 });
-            } else {
+            } else if (result.message) { // Message received, no data object
+                setQueryOutput(result.message); // Set as string for textarea display
+                toast({
+                    title: "No Data Found",
+                    description: `No data returned for selected columns in ${selectedService} from ${environment}. ${result.message}`,
+                    variant: "destructive",
+                });
+            }
+            else { // No data and no specific message
                 setQueryOutput("No data found for the selected columns.");
                 toast({
                     title: "No Data Found",
@@ -222,12 +230,15 @@ const ServiceCall = () => {
             if (!response.ok) throw new Error((await response.json()).error || `HTTP error! status: ${response.status}`);
             const result = await response.json();
 
-            if (result.data) { // Changed condition
+            if (result.data) { // Data object received
                 setQueryOutput([result.data]); // Ensure queryOutput is always an array for table rendering
                 toast({ title: "Data Creation Successful", description: result.message || `Intake data created and verified in ${environment}.` });
-            } else {
-                setQueryOutput(result.message || "An unknown issue occurred.");
+            } else if (result.message) { // Message received, no data object
+                setQueryOutput(result.message); // Set as string for textarea display
                 toast({ title: "Data Creation Info", description: result.message || "Process finished.", variant: "destructive" });
+            } else { // No data and no specific message
+                setQueryOutput("An unknown issue occurred during data creation.");
+                toast({ title: "Data Creation Info", description: "Process finished.", variant: "destructive" });
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -343,14 +354,25 @@ const ServiceCall = () => {
             const result = await response.json();
             
 
-            if (result.message) { // result.message exists
-                setQueryOutput([result.data || result.message]); // Ensure queryOutput is always an array
+            if (result.message) { // Message received
+                if (result.data) { // If there is data, display it in table format
+                    setQueryOutput([result.data]);
+                } else { // If only a message, display message in textarea
+                    setQueryOutput(result.message);
+                }
                 toast({
                     title: "Data Created",
                     description: result.message,
                 });
-            } else {
-                setQueryOutput(["Data created successfully, but no specific message returned."]); // Ensure queryOutput is always an array
+            } else if (result.data) { // If there is data but no message
+                setQueryOutput([result.data]);
+                toast({
+                    title: "Data Created",
+                    description: "Data created successfully.",
+                });
+            }
+            else { // Neither message nor data
+                setQueryOutput("Data created successfully, but no specific message returned.");
                 toast({
                     title: "Data Created",
                     description: "Data created successfully.",
