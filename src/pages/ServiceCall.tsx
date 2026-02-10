@@ -240,27 +240,47 @@ const ServiceCall = () => {
                 <h3 className="text-xl font-semibold mb-4 text-white">Output</h3>
                 {isDataArray ? (() => {
                     const firstRow = queryOutput[0];
-                    const columnsToShow = Object.keys(firstRow).filter(key => firstRow[key] !== null && firstRow[key] !== undefined);
+                    const allKeys = Object.keys(firstRow);
+                    const columnsToShow = allKeys.filter(key =>
+                        queryOutput.some(row => row[key] !== null && row[key] !== undefined && safeToString(row[key]).trim() !== '')
+                    );
 
                     if (columnsToShow.length === 0) {
                         return <p className="text-muted-foreground">Query returned a result, but all columns are empty.</p>;
                     }
 
                     return (
-                        <Table className="bg-background rounded-lg">
-                            <TableHeader>
-                                <TableRow>
-                                    {columnsToShow.map(key => <TableHead key={key}>{key}</TableHead>)}
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {queryOutput.map((row, rowIndex) => (
-                                    <TableRow key={rowIndex}>
-                                        {columnsToShow.map(key => <TableCell key={`${rowIndex}-${key}`}>{safeToString(row[key])}</TableCell>)}
+                        <div className="overflow-x-auto rounded-lg shadow-2xl border border-gray-200">
+                            <Table className="w-full">
+                                <TableHeader>
+                                    <TableRow className="bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 transition-all">
+                                        {columnsToShow.map(key => (
+                                            <TableHead key={key} className="text-white font-semibold py-4 px-4 text-left">
+                                                {key}
+                                            </TableHead>
+                                        ))}
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {queryOutput.map((row, rowIndex) => (
+                                        <TableRow 
+                                            key={rowIndex}
+                                            className={`${
+                                                rowIndex % 2 === 0 
+                                                    ? 'bg-gray-50 hover:bg-blue-50' 
+                                                    : 'bg-white hover:bg-blue-50'
+                                            } transition-colors border-b border-gray-200 last:border-b-0`}
+                                        >
+                                            {columnsToShow.map(key => (
+                                                <TableCell key={`${rowIndex}-${key}`} className="py-3 px-4 text-gray-900 font-medium">
+                                                    {safeToString(row[key])}
+                                                </TableCell>
+                                            ))}
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
                     );
                 })() : (
                     <Textarea
