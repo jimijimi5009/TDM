@@ -244,14 +244,15 @@ const ServiceCall = () => {
                         allRows.flatMap(row => Object.keys(row))
                     ));
                     
-                    const columnsToShow = allPossibleKeys.filter(key =>
-                        allRows.some(row => {
+                    const columnsToShow = allPossibleKeys.filter(key => {
+                        return allRows.some(row => {
                             const value = row[key];
                             if (value === null || value === undefined) return false;
                             const strValue = safeToString(value).trim();
-                            return strValue !== '' && strValue.toLowerCase() !== 'null';
-                        })
-                    );
+                            if (!strValue || strValue === '' || strValue.toLowerCase() === 'null') return false;
+                            return true;
+                        });
+                    });
 
                     if (columnsToShow.length === 0) {
                         return <p className="text-muted-foreground">Query returned a result, but all columns are empty.</p>;
