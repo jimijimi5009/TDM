@@ -394,20 +394,25 @@ app.post('/api/create-intake-data', async (req: Request, res: Response) => {
             const zipCode = generateZipCode(); // Generate ZIP code
             const subscriberId = generateSubscriberId(); // Generate Subscriber ID
             const intakeId = String(Math.floor(Math.random() * 9000000) + 1000000); // 7-digit INTAKEID
+            const planId = '16706'; // Fixed PLANID
+            const insPatId = 'TESTTEST05'; // Fixed INSPATID as per snippet
 
             try {
-                // Statements are executed individually but commit/rollback is managed manually
-                const insertPatientSql = `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB, ZIP) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD-MON-YY'), :6)`;
-                await connection.execute(insertPatientSql, [patientNumber, firstName, lastName, phone, dob, zipCode], { autoCommit: false });
+                // Statements are executed individually with intermediate commits
+                // Order: TBLPATINTAKE -> TBLPATINTAKEPLAN -> TBLPATIENT
 
-                const insertIntakePlanSql = `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASTNAME, INSPHONE, INSDOB, SUBSCRIBERID) VALUES (:1, :2, :3, :4, :5, :6, :7, TO_DATE(:8, 'DD-MON-YY'), :9)`;
-                await connection.execute(insertIntakePlanSql, [patientNumber, intakeId, OPERATION_CENTER_CODE, PLAN_LEVEL_CD, firstName, lastName, phone, dob, subscriberId], { autoCommit: false });
-
+                // 1. TBLPATINTAKE
                 const insertIntakeSql = `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`;
-                await connection.execute(insertIntakeSql, [patientNumber, intakeId, OPERATION_CENTER_CODE], { autoCommit: false });
+                await connection.execute(insertIntakeSql, [patientNumber, intakeId, OPERATION_CENTER_CODE], { autoCommit: true });
 
-                // If all inserts succeed, commit the transaction
-                await connection.commit();
+                // 2. TBLPATINTAKEPLAN
+                const insertIntakePlanSql = `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASTNAME, INSPHONE, INSDOB, PLANID, INSPATID) VALUES (:1, :2, :3, :4, :5, :6, :7, TO_DATE(:8, 'DD-MON-YY'), :9, :10)`;
+                await connection.execute(insertIntakePlanSql, [patientNumber, intakeId, OPERATION_CENTER_CODE, PLAN_LEVEL_CD, firstName, lastName, phone, dob, planId, insPatId], { autoCommit: true });
+
+                // 3. TBLPATIENT
+                const insertPatientSql = `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD-MON-YY'))`;
+                await connection.execute(insertPatientSql, [patientNumber, firstName, lastName, phone, dob], { autoCommit: true });
+
                 success = true;
 
                 // Verification Step
@@ -421,8 +426,7 @@ app.post('/api/create-intake-data', async (req: Request, res: Response) => {
                 break; // Exit the loop on success
 
             } catch (err: unknown) {
-                // Rollback transaction on any error
-                if (connection) await connection.rollback();
+                // No rollback possible as we are auto-committing each step
 
                 // Check if the error is a unique constraint violation (ORA-00001)
                 if ((err as oracledb.DBError).errorNum === 1) {
