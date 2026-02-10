@@ -1,6 +1,6 @@
 import Header from "@/components/Header";
 import { useState, useCallback } from "react";
-import { Plus, Sparkles, Database } from "lucide-react";
+import { Plus, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import StepCard from "@/components/StepCard";
 import DataRow, { DataField } from "@/components/DataRow";
 import DataTypeSelector, { DATA_TYPES } from "@/components/DataTypeSelector";
-
 import { useToast } from "../hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -24,11 +23,10 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
+import { ENVIRONMENTS, SERVICE_TYPES } from "@/constants";
+import { apiService } from "@/services/apiService";
 
 const DEFAULT_FIELDS: DataField[] = [];
-
-const ENVIRONMENTS = ["Q1", "Q2", "Q3", "Q4", "Q5", "PROD"];
 
 const snakeToCamel = (str: string) => {
   return str.toLowerCase().replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
@@ -58,23 +56,14 @@ const ServiceCall = () => {
 
         setIsLoading(true);
         setFields([]);
-        setQueryOutput(null); // Changed from dbQueryOutput
+        setQueryOutput(null);
         setOperationMode(mode);
 
         try {
-            const response = await fetch(`/api/service-schema?environment=${environment}&serviceType=${selectedService}`);
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-            }
-            const result = await response.json();
+            const result = await apiService.fetchSchema(environment, selectedService);
             
-            if (result.schema && result.schema.length > 0) {
-                const initialFields = result.schema.map((field: DataField) => ({
-                    ...field,
-                    value: field.value || "",
-                }));
-                setFields(initialFields);
+            if (result.schema?.length > 0) {
+                setFields(result.schema.map((field: DataField) => ({ ...field, value: field.value || "" })));
                 toast({
                     title: "Schema Loaded",
                     description: `Schema for ${selectedService} from ${environment} loaded for ${mode} operation.`,
@@ -87,7 +76,6 @@ const ServiceCall = () => {
                 });
             }
         } catch (error) {
-            console.error("Failed to fetch service schema:", error);
             toast({
                 title: "Error",
                 description: `Failed to load service schema: ${error instanceof Error ? error.message : String(error)}`,
@@ -159,45 +147,40 @@ const ServiceCall = () => {
         setQueryOutput(null);
 
         try {
-            const response = await fetch('/api/service-execute', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    environment: environment,
-                    serviceType: selectedService,
-                    selectedColumnNames: selectedColumns,
-                }),
-            });
+            const result = await apiService.executeQuery(environment, selectedService, selectedColumns);
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-            }
-            const result = await response.json();
-            
-
-            if (result.data) { // Data object received
-                setQueryOutput([result.data]); // Ensure queryOutput is always an array of objects for table rendering
+            if (result.data) {
+                setQueryOutput([result.data]);
                 toast({
                     title: "Query Executed",
                     description: `Data fetched for ${selectedService} from ${environment}.`,
                 });
-            } else if (result.message) { // Message received, no data object
-                setQueryOutput(result.message); // Set as string for textarea display
+            } else if (result.message) {
+                setQueryOutput(result.message);
                 toast({
                     title: "No Data Found",
-                    description: `No data returned for selected columns in ${selectedService} from ${environment}. ${result.message}`,
+                    description: `No data returned for selected columns in ${selectedService} from ${environment}.`,
                     variant: "destructive",
                 });
-            }
-            else { // No data and no specific message
+            } else {
                 setQueryOutput("No data found for the selected columns.");
                 toast({
                     title: "No Data Found",
                     description: `No data returned for selected columns in ${selectedService} from ${environment}.`,
                     variant: "destructive",
+                });
+            }
+        } catch (error) {
+            setQueryOutput(JSON.stringify({ error: (error as Error).message }, null, 2));
+            toast({
+                title: "Error",
+                description: `Failed to execute service query: ${error instanceof Error ? error.message : String(error)}`,
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [environment, selectedService, fields, toast]);
                 });
             }
         } catch (error) {
@@ -223,32 +206,25 @@ const ServiceCall = () => {
         setQueryOutput(null);
 
         try {
-            const response = await fetch('/api/create-intake-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ environment, serviceType: selectedService }),
-            });
-            if (!response.ok) throw new Error((await response.json()).error || `HTTP error! status: ${response.status}`);
-            const result = await response.json();
+            const result = await apiService.createIntakeData(environment, selectedService);
 
-            if (result.data) { // Data object received
-                setQueryOutput([result.data]); // Ensure queryOutput is always an array for table rendering
+            if (result.data) {
+                setQueryOutput([result.data]);
                 toast({ title: "Data Creation Successful", description: result.message || `Intake data created and verified in ${environment}.` });
-            } else if (result.message) { // Message received, no data object
-                setQueryOutput(result.message); // Set as string for textarea display
+            } else if (result.message) {
+                setQueryOutput(result.message);
                 toast({ title: "Data Creation Info", description: result.message || "Process finished.", variant: "destructive" });
-            } else { // No data and no specific message
+            } else {
                 setQueryOutput("An unknown issue occurred during data creation.");
                 toast({ title: "Data Creation Info", description: "Process finished.", variant: "destructive" });
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error("Failed to create intake data:", error);
             setQueryOutput(JSON.stringify({ error: errorMessage }, null, 2));
             toast({ title: "Error", description: `Failed to create intake data: ${errorMessage}`, variant: "destructive" });
         } finally {
             setIsLoading(false);
-            setCreateConfirmOpen(false); // Close dialog
+            setCreateConfirmOpen(false);
         }
     }, [environment, selectedService, toast]);
 
@@ -257,6 +233,23 @@ const ServiceCall = () => {
 
         const isErrorOrInfoString = typeof queryOutput === 'string';
         const isDataArray = Array.isArray(queryOutput) && queryOutput.length > 0;
+
+        // Helper function to safely convert values to string
+        const safeToString = (value: any): string => {
+            if (value === null || value === undefined) {
+                return '';
+            }
+            const str = String(value);
+            // Check if the conversion resulted in [object Object]
+            if (str === '[object Object]') {
+                try {
+                    return JSON.stringify(value);
+                } catch {
+                    return str;
+                }
+            }
+            return str;
+        };
 
         return (
             <div className="mt-6 p-4 border rounded-lg bg-card-foreground">
@@ -279,7 +272,7 @@ const ServiceCall = () => {
                             <TableBody>
                                 {queryOutput.map((row, rowIndex) => (
                                     <TableRow key={rowIndex}>
-                                        {columnsToShow.map(key => <TableCell key={`${rowIndex}-${key}`}>{String(row[key])}</TableCell>)}
+                                        {columnsToShow.map(key => <TableCell key={`${rowIndex}-${key}`}>{safeToString(row[key])}</TableCell>)}
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -297,7 +290,7 @@ const ServiceCall = () => {
         );
     };
 
-    const handleCreate = useCallback(async () => { // Original handleCreate
+    const handleCreate = useCallback(async () => {
         if (!selectedService) {
             toast({
                 title: "Service Type Required",
@@ -336,43 +329,25 @@ const ServiceCall = () => {
         setQueryOutput(null);
 
         try {
-            const response = await fetch('/api/service-create', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    environment: environment,
-                    serviceType: selectedService,
-                    dataFields: dataToCreate,
-                }),
-            });
+            const result = await apiService.createData(environment, selectedService, dataToCreate);
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-            }
-            const result = await response.json();
-            
-
-            if (result.message) { // Message received
-                if (result.data) { // If there is data, display it in table format
+            if (result.message) {
+                if (result.data) {
                     setQueryOutput([result.data]);
-                } else { // If only a message, display message in textarea
+                } else {
                     setQueryOutput(result.message);
                 }
                 toast({
                     title: "Data Created",
                     description: result.message,
                 });
-            } else if (result.data) { // If there is data but no message
+            } else if (result.data) {
                 setQueryOutput([result.data]);
                 toast({
                     title: "Data Created",
                     description: "Data created successfully.",
                 });
-            }
-            else { // Neither message nor data
+            } else {
                 setQueryOutput("Data created successfully, but no specific message returned.");
                 toast({
                     title: "Data Created",
@@ -380,7 +355,6 @@ const ServiceCall = () => {
                 });
             }
         } catch (error) {
-            console.error("Failed to create service data:", error);
             setQueryOutput(JSON.stringify({ error: (error as Error).message }, null, 2));
             toast({
                 title: "Error",
@@ -426,7 +400,11 @@ const ServiceCall = () => {
                                         <SelectValue placeholder="Select Service Type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="patient-rest-services">Patient Rest Services</SelectItem>
+                                        {SERVICE_TYPES.map((service) => (
+                                            <SelectItem key={service.value} value={service.value}>
+                                                {service.label}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                                 <Button onClick={() => handleFetchSchema("query")} variant="outline" size="sm" disabled={!selectedService}>

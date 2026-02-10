@@ -14,9 +14,43 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Constants
 const API_USER_ID = process.env.API_USER_ID;
 const API_PASSWORD = process.env.API_PASSWORD;
 const EXTERNAL_API_DOMAIN_CORE = process.env.EXTERNAL_API_DOMAIN_CORE || 'localhost:8081';
+const DB_USER = process.env.DB_USER;
+const DB_PASSWORD = process.env.DB_PASSWORD;
+
+const ORACLE_CONFIG: Record<string, { hostName: string; host: string }> = {
+    Q1: { hostName: "ccxqat_adhoc", host: "qa1dbccx-scan" },
+    Q2: { hostName: "ccxsup_adhoc", host: "qa2dbccx-scan.ccx.carecentrix.com" },
+    Q3: { hostName: "qa3.legacy.adhoc", host: "qdborarac-scan" },
+    Q4: { hostName: "ccxprf_provportal", host: "ccxq4host.ccx.carecentrix.com" },
+    Q5: { hostName: "qa5.legacy.adhoc", host: "qdborarac-scan" },
+    PROD: { hostName: "ccxp_adhoc", host: "ccxphost.ccx.carecentrix.com" },
+};
+
+const OPERATION_CENTER_CODE = "TAMPA";
+const PLAN_LEVEL_CD = "1";
+const FIXED_PLAN_ID = "16706";
+const FIXED_INS_PAT_ID = "TESTTEST05";
+const MAX_RETRIES = 50;
+
+let oraclePool: oracledb.Pool | null = null;
+
+// Initialize Oracle connection pool
+const initializePool = async () => {
+    if (!oraclePool) {
+        oraclePool = await oracledb.createPool({
+            user: DB_USER,
+            password: DB_PASSWORD,
+            connectString: '',
+            poolMin: 2,
+            poolMax: 10,
+        });
+    }
+    return oraclePool;
+};
 
 const getExternalApiBaseUrl = (env: string): string => {
     const envPrefix = env.toLowerCase();
@@ -24,25 +58,46 @@ const getExternalApiBaseUrl = (env: string): string => {
 };
 
 const getOracleConnectionString = (env: string): string => {
-    let hostName: string | null = null;
-    switch (env.toUpperCase()) {
-      case "Q1": hostName = "ccxqat_adhoc"; break;
-      case "Q2": hostName = "ccxsup_adhoc"; break;
-      case "Q3": hostName = "qa3.legacy.adhoc"; break;
-      case "Q4": hostName = "ccxprf_provportal"; break;
-      case "Q5": hostName = "qa5.legacy.adhoc"; break;
-      case "PROD": hostName = "ccxp_adhoc"; break;
-      default:
-        console.error("Unable to get the hostname for Oracle");
+    const config = ORACLE_CONFIG[env.toUpperCase()];
+    if (!config) {
+        console.error("Unable to get configuration for Oracle environment:", env);
         return "Invalid Environment";
     }
+    const { hostName, host } = config;
+    return `(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=${host})(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=${hostName})))`;
+};
 
-    if (env.toUpperCase() === "Q1") return `(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=qa1dbccx-scan)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=${hostName})))`;
-    if (env.toUpperCase() === "Q2") return `(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=qa2dbccx-scan.ccx.carecentrix.com)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=${hostName})))`;
-    if (env.toUpperCase() === "Q4") return `(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ccxq4host.ccx.carecentrix.com)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=${hostName})))`;
-    if (env.toUpperCase() === "PROD") return `(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ccxphost.ccx.carecentrix.com)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=${hostName})))`;
-    
-    return `(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST=qdborarac-scan)(PORT=1521)))(CONNECT_DATA=(SERVICE_NAME=${hostName})(GLOBAL_NAME=${hostName})))`;
+// Create a reusable connection helper
+const executeWithConnection = async <T>(
+    callback: (connection: oracledb.Connection) => Promise<T>,
+    environment: string
+): Promise<T> => {
+    let connection: oracledb.Connection | undefined;
+    try {
+        const connectionString = getOracleConnectionString(environment);
+        connection = await oracledb.getConnection({
+            user: DB_USER,
+            password: DB_PASSWORD,
+            connectString: connectionString
+        });
+        return await callback(connection);
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (err) {
+                console.error('Error closing database connection:', err);
+            }
+        }
+    }
+};
+
+// Standard error response
+const errorResponse = (res: Response, statusCode: number, error: string, details?: string) => {
+    res.status(statusCode).json({
+        error,
+        ...(details && { details })
+    });
 };
 
 
@@ -54,27 +109,19 @@ app.get('/api/schema', async (req: Request, res: Response) => {
   const { environment, tableName } = req.query;
 
   if (!environment || !tableName) {
-    return res.status(400).json({ error: 'environment and tableName query parameters are required.' });
+    return errorResponse(res, 400, 'environment and tableName query parameters are required.');
   }
 
-  let connection;
   try {
-    const connectionString = getOracleConnectionString(environment as string);
+    const result = await executeWithConnection(async (connection) => {
+      return await connection.execute(
+        `SELECT COLUMN_NAME, DATA_TYPE, DATA_LENGTH, DATA_PRECISION, DATA_SCALE, NULLABLE
+         FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = :tableName`,
+        [(tableName as string).toUpperCase()],
+        { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      );
+    }, environment as string);
 
-    connection = await oracledb.getConnection({
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      connectString: connectionString
-    });
-
-    const result = await connection.execute(
-      `SELECT COLUMN_NAME, DATA_TYPE, DATA_LENGTH, DATA_PRECISION, DATA_SCALE, NULLABLE
-       FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = :tableName`,
-      [(tableName as string).toUpperCase()], // Bind variables - CONVERT TO UPPERCASE
-      { outFormat: oracledb.OUT_FORMAT_OBJECT } // Get results as an array of objects
-    );
-    
-    // The result.rows will be an array of objects, e.g., [{COLUMN_NAME: '...', DATA_TYPE: '...'}]
     interface OracleColumnMetadata {
         COLUMN_NAME: string;
         DATA_TYPE: string;
@@ -83,12 +130,13 @@ app.get('/api/schema', async (req: Request, res: Response) => {
         DATA_SCALE: number | null;
         NULLABLE: 'Y' | 'N';
     }
+
     const schema = (result.rows as OracleColumnMetadata[])?.map((row) => ({
         column_name: row.COLUMN_NAME,
         data_type: row.DATA_TYPE,
         data_length: row.DATA_LENGTH,
         data_precision: row.DATA_PRECISION,
-        is_nullable: row.NULLABLE === 'Y' // Convert 'Y'/'N' to boolean
+        is_nullable: row.NULLABLE === 'Y'
     }));
 
     res.json({
@@ -98,146 +146,85 @@ app.get('/api/schema', async (req: Request, res: Response) => {
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch schema from database.', details: (err as Error).message });
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (err: unknown) {
-        console.error(err);
-      }
-    }
+    errorResponse(res, 500, 'Failed to fetch schema from database.', (err as Error).message);
   }
 });
 
-
-app.listen(port, () => {
-  console.log(`Server listening at http://localhost:${port}`);
-});
-
-const snakeToCamel = (str: string) => {
-  return str.toLowerCase().replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+// Utility functions
+const serializeOracleRow = (row: any): Record<string, any> => {
+  if (row === null || row === undefined) return row;
+  
+  const serialized: Record<string, any> = {};
+  const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  
+  for (const key in row) {
+    const value = row[key];
+    if (value === null || value === undefined) {
+      serialized[key] = value;
+    } else if (value instanceof Date) {
+      const day = String(value.getDate()).padStart(2, '0');
+      const month = monthNames[value.getMonth()];
+      const year = String(value.getFullYear()).slice(-2);
+      serialized[key] = `${day}-${month}-${year}`;
+    } else if (typeof value === 'object') {
+      const constructorName = value.constructor?.name.toLowerCase();
+      if (constructorName?.includes('lob') || constructorName?.includes('cursor')) {
+        serialized[key] = String(value);
+      } else if (Buffer && value instanceof Buffer) {
+        serialized[key] = value.toString('utf-8');
+      } else {
+        try {
+          serialized[key] = String(value).includes('[object') ? JSON.stringify(value) : String(value);
+        } catch {
+          serialized[key] = String(value);
+        }
+      }
+    } else {
+      serialized[key] = value;
+    }
+  }
+  return serialized;
 };
 
-const generatePatientNumber = () => {
-  return Array(10).fill(0).map(() => Math.floor(Math.random() * 10)).join('');
-};
+const snakeToCamel = (str: string) => str.toLowerCase().replace(/_([a-z])/g, (_, l) => l.toUpperCase());
 
-const generateRandomName = (prefix: string) => {
+// Random data generators
+const generateRandom = (length: number): string => Array(length).fill(0).map(() => Math.floor(Math.random() * 10)).join('');
+const generatePatientNumber = () => generateRandom(10);
+const generateZipCode = () => generateRandom(5);
+const generateSubscriberId = () => generateRandom(10);
+const generateIntakeId = () => Date.now().toString().slice(-7) + generateRandom(4);
+
+const generateRandomName = (prefix: string): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let result = prefix;
-    for (let i = 0; i < 5; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
+    for (let i = 0; i < 5; i++) result += chars[Math.floor(Math.random() * chars.length)];
     return result;
 };
 
-const generatePhoneNumber = () => {
-    const randomDigits = () => Array(3).fill(0).map(() => Math.floor(Math.random() * 10)).join('');
+const generatePhoneNumber = (): string => {
+    const randomDigits = () => generateRandom(3);
     return `(${randomDigits()}) ${randomDigits()}-${randomDigits()}`;
 };
 
-const generateDob = () => {
-    const day = String(Math.floor(Math.random() * 28) + 1).padStart(2, '0');
+const generateDob = (): string => {
     const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    const day = String(Math.floor(Math.random() * 28) + 1).padStart(2, '0');
     const month = monthNames[Math.floor(Math.random() * 12)];
     const year = String(Math.floor(Math.random() * 30) + 70);
     return `${day}-${month}-${year}`;
 };
 
-const generateIntakeId = () => {
-    return Date.now().toString().slice(-7) + String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+// Determine column type based on column name
+const getColumnType = (columnName: string): string => {
+    const lowerName = columnName.toLowerCase();
+    if (lowerName.includes('date') || lowerName.includes('dob')) return 'date';
+    if (lowerName.includes('name')) return 'names';
+    return 'text';
 };
 
-const generateZipCode = () => {
-    return Array(5).fill(0).map(() => Math.floor(Math.random() * 10)).join('');
-};
-
-const generateSubscriberId = () => {
-    return Array(10).fill(0).map(() => Math.floor(Math.random() * 10)).join('');
-};
-
-const OPERATION_CENTER_CODE = "TAMPA";
-const PLAN_LEVEL_CD = "1";
-
-app.post('/api/external-call', async (req: Request, res: Response) => {
-  const { apiType, environment, requestBody } = req.body;
-
-  if (!apiType || !environment) {
-    return res.status(400).json({ error: 'apiType and environment are required.' });
-  }
-
-  if (!API_USER_ID || !API_PASSWORD) {
-    return res.status(500).json({ error: 'API_USER_ID or API_PASSWORD not set in environment variables.' });
-  }
-
-  let externalApiPath = '';
-  switch (apiType) {
-    case 'initial':
-      externalApiPath = `/cases`;
-      break;
-    case 'cos':
-      externalApiPath = `/cos-path-placeholder`;
-      break;
-    case 'edit':
-      externalApiPath = `/edit-path-placeholder`;
-      break;
-    default:
-      return res.status(400).json({ error: 'Invalid apiType.' });
-  }
-
-  const externalApiBaseUrl = getExternalApiBaseUrl(environment as string);
-  const externalApiUrl = `${externalApiBaseUrl}${externalApiPath}`;
-
-  try {
-    const authHeader = `Basic ${Buffer.from(`${API_USER_ID}:${API_PASSWORD}`).toString('base64')}`;
-
-    const externalApiResponse = await fetch(externalApiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authHeader,
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    let responseData;
-    const contentType = externalApiResponse.headers.get('content-type');
-
-    if (contentType && contentType.includes('application/json')) {
-      responseData = await externalApiResponse.json();
-    } else {
-      responseData = await externalApiResponse.text();
-    }
-
-    if (!externalApiResponse.ok) {
-      const errorMessage = (typeof responseData === 'object' && responseData !== null && 'message' in responseData)
-        ? responseData.message
-        : (typeof responseData === 'string' ? responseData : externalApiResponse.statusText);
-      return res.status(externalApiResponse.status).json({
-        error: `External API Error: ${externalApiResponse.status} ${externalApiResponse.statusText}`,
-        details: errorMessage,
-        externalResponse: responseData
-      });
-    }
-
-    res.json(responseData);
-
-  } catch (error) {
-    console.error('Error proxying external API call:', error);
-    res.status(500).json({ error: 'Failed to proxy external API call.', details: (error as Error).message });
-  }
-});
-
-app.get('/api/service-schema', async (req: Request, res: Response) => {
-    const { environment, serviceType } = req.query;
-
-    if (!environment || !serviceType) {
-        return res.status(400).json({ error: 'environment and serviceType query parameters are required.' });
-    }
-
-    const USER_PROVIDED_SQL_QUERY = `
+// SQL queries
+const PATIENT_DATA_QUERY = `
 SELECT tp.ZIP, tp.DOB, tp.FIRSTNAME, tp.LASTNAME, tpip.INSPHONE, tpip.SUBSCRIBERID
 FROM TBLPATIENT tp
 JOIN TBLPATINTAKEPLAN tpip
@@ -251,69 +238,7 @@ AND tpip.SUBSCRIBERID IS NOT NULL
 ORDER BY tp.DOB DESC
 FETCH FIRST 1 ROW ONLY`;
 
-    let connection;
-    try {
-        const connectionString = getOracleConnectionString(environment as string);
-
-        connection = await oracledb.getConnection({
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            connectString: connectionString
-        });
-
-        const result = await connection.execute(
-            USER_PROVIDED_SQL_QUERY,
-            [], // No bind variables for this query
-            { outFormat: oracledb.OUT_FORMAT_OBJECT }
-        );
-
-
-        const schemaFields = result.metaData?.map((col: oracledb.Metadata<any>, index: number) => {
-            let type = 'text';
-            if (col.name.toLowerCase().includes('date') || col.name.toLowerCase().includes('dob')) {
-                type = 'date';
-            } else if (col.name.toLowerCase().includes('phone') || col.name.toLowerCase().includes('zip') || col.name.toLowerCase().includes('id')) {
-                type = 'text';
-            } else if (col.name.toLowerCase().includes('name')) {
-                type = 'names';
-            }
-
-            return {
-                id: `${index}-${col.name}`,
-                type: type,
-                propertyName: snakeToCamel(col.name),
-                option: "",
-                checked: true,
-            };
-        });
-
-        res.json({
-            environment,
-            serviceType,
-            schema: schemaFields || [],
-        });
-
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch service schema from database.', details: (err as Error).message });
-    } finally {
-        if (connection) {
-            try {
-                await connection.close();
-            } catch (err: unknown) {
-                console.error('Error closing database connection:', err);
-            }
-        }
-    }
-});
-
-app.post('/api/service-execute', async (req: Request, res: Response) => {
-    const { environment, serviceType, selectedColumnNames } = req.body;
-
-    if (!environment || !serviceType || !selectedColumnNames || !Array.isArray(selectedColumnNames) || selectedColumnNames.length === 0) {
-        return res.status(400).json({ error: 'environment, serviceType, and selectedColumnNames array are required.' });
-    }
-
-    const BASE_SQL_QUERY_STRUCTURE = `
+const PATIENT_DATA_FROM_CLAUSE = `
 FROM TBLPATIENT tp
 JOIN TBLPATINTAKEPLAN tpip
 ON tp.PATIENTNUMBER = tpip.PATIENTNUMBER
@@ -326,227 +251,229 @@ AND tpip.SUBSCRIBERID IS NOT NULL
 ORDER BY tp.DOB DESC
 FETCH FIRST 1 ROW ONLY`;
 
-    const selectClause = selectedColumnNames.map((col: string) => col).join(', ');
-    const fullSqlQuery = `SELECT ${selectClause} ${BASE_SQL_QUERY_STRUCTURE}`;
+const API_PATHS: Record<string, string> = {
+    initial: '/cases',
+    cos: '/cos-path-placeholder',
+    edit: '/edit-path-placeholder',
+};
 
-    let connection;
+app.listen(port, () => {
+  console.log(`Server listening at http://localhost:${port}`);
+});
+
+app.post('/api/external-call', async (req: Request, res: Response) => {
+  const { apiType, environment, requestBody } = req.body;
+
+  if (!apiType || !environment) {
+    return errorResponse(res, 400, 'apiType and environment are required.');
+  }
+
+  if (!API_USER_ID || !API_PASSWORD) {
+    return errorResponse(res, 500, 'API_USER_ID or API_PASSWORD not set in environment variables.');
+  }
+
+  const externalApiPath = API_PATHS[apiType];
+  if (!externalApiPath) {
+    return errorResponse(res, 400, 'Invalid apiType.');
+  }
+
+  const externalApiUrl = `${getExternalApiBaseUrl(environment)}${externalApiPath}`;
+
+  try {
+    const authHeader = `Basic ${Buffer.from(`${API_USER_ID}:${API_PASSWORD}`).toString('base64')}`;
+    const externalApiResponse = await fetch(externalApiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const contentType = externalApiResponse.headers.get('content-type');
+    const responseData = contentType?.includes('application/json')
+      ? await externalApiResponse.json()
+      : await externalApiResponse.text();
+
+    if (!externalApiResponse.ok) {
+      const errorMessage = (typeof responseData === 'object' && responseData?.message)
+        ? responseData.message
+        : externalApiResponse.statusText;
+      return errorResponse(res, externalApiResponse.status, `External API Error: ${externalApiResponse.status}`, errorMessage);
+    }
+
+    res.json(responseData);
+
+  } catch (error) {
+    errorResponse(res, 500, 'Failed to proxy external API call.', (error as Error).message);
+  }
+});
+
+app.get('/api/service-schema', async (req: Request, res: Response) => {
+    const { environment, serviceType } = req.query;
+
+    if (!environment || !serviceType) {
+        return errorResponse(res, 400, 'environment and serviceType query parameters are required.');
+    }
+
     try {
-        const connectionString = getOracleConnectionString(environment as string);
+        const result = await executeWithConnection(async (connection) => {
+            return await connection.execute(PATIENT_DATA_QUERY, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        }, environment as string);
 
-        connection = await oracledb.getConnection({
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            connectString: connectionString
+        const schemaFields = result.metaData?.map((col: oracledb.Metadata<any>, index: number) => ({
+            id: `${index}-${col.name}`,
+            type: getColumnType(col.name),
+            propertyName: snakeToCamel(col.name),
+            option: "",
+            checked: true,
+        }));
+
+        res.json({
+            environment,
+            serviceType,
+            schema: schemaFields || [],
         });
 
-        const result = await connection.execute(
-            fullSqlQuery,
-            [],
-            { outFormat: oracledb.OUT_FORMAT_OBJECT }
-        );
+    } catch (err) {
+        errorResponse(res, 500, 'Failed to fetch service schema from database.', (err as Error).message);
+    }
+});
+
+app.post('/api/service-execute', async (req: Request, res: Response) => {
+    const { environment, serviceType, selectedColumnNames } = req.body;
+
+    if (!environment || !serviceType || !selectedColumnNames?.length) {
+        return errorResponse(res, 400, 'environment, serviceType, and selectedColumnNames array are required.');
+    }
+
+    try {
+        const selectClause = selectedColumnNames.join(', ');
+        const fullSqlQuery = `SELECT ${selectClause} ${PATIENT_DATA_FROM_CLAUSE}`;
+
+        const result = await executeWithConnection(async (connection) => {
+            return await connection.execute(fullSqlQuery, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        }, environment);
 
         res.json({
             environment,
             serviceType,
             selectedColumns: selectedColumnNames,
-            data: result.rows && result.rows.length > 0 ? result.rows[0] : null,
+            data: result.rows?.length > 0 ? serializeOracleRow(result.rows[0]) : null,
         });
 
     } catch (err) {
-        res.status(500).json({ error: 'Failed to execute service query.', details: (err as Error).message });
-    } finally {
-        if (connection) {
-            try {
-                await connection.close();
-            } catch (err: unknown) {
-                console.error('Error closing database connection:', err);
-            }
-        }
+        errorResponse(res, 500, 'Failed to execute service query.', (err as Error).message);
     }
 });
 
-app.post('/api/create-intake-data', async (req: Request, res: Response) => {
-    const { environment, serviceType } = req.body;
+// Helper function to create intake data with retry logic
+const createIntakeDataWithRetry = async (
+    connection: oracledb.Connection,
+    maxRetries: number = MAX_RETRIES
+): Promise<{ success: boolean; verificationData: any }> => {
+    let success = false;
+    let verificationData: any = null;
 
-    if (!environment || !serviceType) {
-        return res.status(400).json({ error: 'environment and serviceType are required.' });
-    }
-
-    let connection: oracledb.Connection | undefined;
-    try {
-        const connectionString = getOracleConnectionString(environment as string);
-        connection = await oracledb.getConnection({
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            connectString: connectionString
-        });
-
-        const MAX_RETRIES = 50;
-        let success = false;
-        let verificationData: any = null;
-
-        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
             const patientNumber = generatePatientNumber();
             const firstName = generateRandomName('FIRST');
             const lastName = generateRandomName('LAST');
             const phone = generatePhoneNumber();
             const dob = generateDob();
-            const zipCode = generateZipCode(); // Generate ZIP code
-            const subscriberId = generateSubscriberId(); // Generate Subscriber ID
-            const intakeId = String(Math.floor(Math.random() * 9000000) + 1000000); // 7-digit INTAKEID
-            const planId = '16706'; // Fixed PLANID
-            const insPatId = 'TESTTEST05'; // Fixed INSPATID as per snippet
+            const intakeId = String(Math.floor(Math.random() * 9000000) + 1000000);
 
-            try {
-                // Statements are executed individually with intermediate commits
-                // Order: TBLPATINTAKE -> TBLPATINTAKEPLAN -> TBLPATIENT
+            // Insert in order with auto-commit
+            await connection.execute(
+                `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`,
+                [patientNumber, intakeId, OPERATION_CENTER_CODE],
+                { autoCommit: true }
+            );
 
-                // 1. TBLPATINTAKE
-                const insertIntakeSql = `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`;
-                await connection.execute(insertIntakeSql, [patientNumber, intakeId, OPERATION_CENTER_CODE], { autoCommit: true });
+            await connection.execute(
+                `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASTNAME, INSPHONE, INSDOB, PLANID, INSPATID) VALUES (:1, :2, :3, :4, :5, :6, :7, TO_DATE(:8, 'DD-MON-YY'), :9, :10)`,
+                [patientNumber, intakeId, OPERATION_CENTER_CODE, PLAN_LEVEL_CD, firstName, lastName, phone, dob, FIXED_PLAN_ID, FIXED_INS_PAT_ID],
+                { autoCommit: true }
+            );
 
-                // 2. TBLPATINTAKEPLAN
-                const insertIntakePlanSql = `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASTNAME, INSPHONE, INSDOB, PLANID, INSPATID) VALUES (:1, :2, :3, :4, :5, :6, :7, TO_DATE(:8, 'DD-MON-YY'), :9, :10)`;
-                await connection.execute(insertIntakePlanSql, [patientNumber, intakeId, OPERATION_CENTER_CODE, PLAN_LEVEL_CD, firstName, lastName, phone, dob, planId, insPatId], { autoCommit: true });
+            await connection.execute(
+                `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD-MON-YY'))`,
+                [patientNumber, firstName, lastName, phone, dob],
+                { autoCommit: true }
+            );
 
-                // 3. TBLPATIENT
-                const insertPatientSql = `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD-MON-YY'))`;
-                await connection.execute(insertPatientSql, [patientNumber, firstName, lastName, phone, dob], { autoCommit: true });
+            const verifyResult = await connection.execute(
+                `SELECT * FROM TBLPATINTAKEPLAN WHERE PATIENTNUMBER = :1 AND INSFIRSTNAME = :2`,
+                [patientNumber, firstName],
+                { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            );
 
-                success = true;
+            verificationData = verifyResult.rows?.map(row => serializeOracleRow(row)) || null;
+            success = true;
+            break;
 
-                // Verification Step
-                const verificationSql = `SELECT * FROM TBLPATINTAKEPLAN WHERE PATIENTNUMBER = :1 AND INSFIRSTNAME = :2`;
-                const verifyResult = await connection.execute(verificationSql, [patientNumber, firstName], { outFormat: oracledb.OUT_FORMAT_OBJECT });
-
-                if (verifyResult.rows && verifyResult.rows.length > 0) {
-                    verificationData = verifyResult.rows;
-                }
-                
-                break; // Exit the loop on success
-
-            } catch (err: unknown) {
-                // No rollback possible as we are auto-committing each step
-
-                // Check if the error is a unique constraint violation (ORA-00001)
-                if ((err as oracledb.DBError).errorNum === 1) {
-                    console.log(`Attempt ${attempt} failed due to unique constraint violation. Retrying...`);
-                    // Continue to the next iteration of the loop
-                } else {
-                    // If it's another type of error, throw it to be caught by the outer catch block
-                    throw err;
-                }
+        } catch (err: unknown) {
+            if ((err as oracledb.DBError).errorNum === 1) {
+                console.log(`Attempt ${attempt}/${maxRetries} failed due to constraint violation.`);
+                if (attempt === maxRetries) throw err;
+            } else {
+                throw err;
             }
         }
+    }
 
-        if (success) {
+    return { success, verificationData };
+};
+
+app.post('/api/create-intake-data', async (req: Request, res: Response) => {
+    const { environment, serviceType } = req.body;
+
+    if (!environment || !serviceType) {
+        return errorResponse(res, 400, 'environment and serviceType are required.');
+    }
+
+    try {
+        const result = await executeWithConnection(async (connection) => {
+            return await createIntakeDataWithRetry(connection);
+        }, environment);
+
+        if (result.success) {
             res.json({
                 message: 'Intake data created and verified successfully.',
-                data: verificationData,
+                data: result.verificationData,
             });
         } else {
-            res.status(500).json({ error: `Failed to create intake data after ${MAX_RETRIES} attempts. The last attempt may have failed due to a unique constraint or another issue.` });
+            errorResponse(res, 500, `Failed to create intake data after ${MAX_RETRIES} attempts.`);
         }
 
     } catch (err) {
-        console.error('Error during intake data creation process:', err);
-        res.status(500).json({ error: 'Failed to process intake creation.', details: (err as Error).message });
-    } finally {
-        if (connection) {
-            try {
-                await connection.close();
-            } catch (err) {
-                console.error('Error closing database connection:', err);
-            }
-        }
+        errorResponse(res, 500, 'Failed to process intake creation.', (err as Error).message);
     }
 });
 
 app.post('/api/service-create', async (req: Request, res: Response) => {
     const { environment, serviceType, dataFields } = req.body;
 
-    if (!environment || !serviceType || !dataFields || !Array.isArray(dataFields)) {
-        return res.status(400).json({ error: 'environment, serviceType, and dataFields array are required.' });
+    if (!environment || !serviceType || !dataFields?.length) {
+        return errorResponse(res, 400, 'environment, serviceType, and dataFields array are required.');
     }
 
-    let connection;
     try {
-        const connectionString = getOracleConnectionString(environment as string);
+        const result = await executeWithConnection(async (connection) => {
+            return await createIntakeDataWithRetry(connection, 5);
+        }, environment);
 
-        connection = await oracledb.getConnection({
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            connectString: connectionString
-        });
-
-        let patientNumber = '';
-        let firstName = '';
-        let lastName = '';
-        let phone = '';
-        let dob = '';
-        let intakeId = '';
-
-        const MAX_RETRIES = 5;
-        let retryCount = 0;
-        let success = false;
-        let verificationResult: { PATIENTNUMBER: string; INTAKEID: string; OPERATIONCENTERCODE: string; } | null = null;
-
-        while (retryCount < MAX_RETRIES && !success) {
-            patientNumber = generatePatientNumber();
-            firstName = generateRandomName('FIRST');
-            lastName = generateRandomName('LAST');
-            phone = generatePhoneNumber();
-            dob = generateDob();
-            intakeId = generateIntakeId();
-
-            try {
-
-                const insertPatientSql = `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB) VALUES (:1, :2, :3, :4, :5)`;
-                await connection.execute(insertPatientSql, [patientNumber, firstName, lastName, phone, dob], { autoCommit: false });
-
-                const insertIntakePlanSql = `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASNAME, INSPHONE, INSDOB) VALUES (:1, :2, :3, :4, :5, :6, :7, :8)`;
-                await connection.execute(insertIntakePlanSql, [patientNumber, intakeId, OPERATION_CENTER_CODE, PLAN_LEVEL_CD, firstName, lastName, phone, dob], { autoCommit: false });
-
-                const insertIntakeSql = `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`;
-                await connection.execute(insertIntakeSql, [patientNumber, intakeId, OPERATION_CENTER_CODE], { autoCommit: false });
-
-                await connection.commit();
-                success = true;
-
-            } catch (err: unknown) {
-                await connection.rollback();
-                if ((err as oracledb.DBError).errorNum === 1) {
-                    retryCount++;
-                } else {
-                    throw err;
-                }
-            }
+        if (result.success) {
+            res.json({
+                message: 'Intake data created and verified successfully.',
+                data: result.verificationData,
+            });
+        } else {
+            errorResponse(res, 500, 'Failed to create intake data after multiple retries.');
         }
 
-        if (!success) {
-            return res.status(500).json({ error: 'Failed to create intake data after multiple retries due to unique INTAKEID constraint.' });
-        }
-
-        const verificationSql = `SELECT PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE FROM TBLPATINTAKE WHERE PATIENTNUMBER = :1 AND INTAKEID = :2`;
-        const verifyResult = await connection.execute(verificationSql, [patientNumber, intakeId], { outFormat: oracledb.OUT_FORMAT_OBJECT });
-
-        if (verifyResult.rows && verifyResult.rows.length > 0) {
-            verificationResult = verifyResult.rows[0] as { PATIENTNUMBER: string; INTAKEID: string; OPERATIONCENTERCODE: string; };
-        }
-
-        res.json({
-            message: 'Intake data created and verified successfully.',
-            data: verificationResult,
-        });
-
-    } catch (err: unknown) {
-        res.status(500).json({ error: 'Failed to create service data.', details: (err as Error).message });
-    } finally {
-        if (connection) {
-            try {
-                await connection.close();
-            } catch (err: unknown) {
-            }
-        }
+    } catch (err) {
+        errorResponse(res, 500, 'Failed to create service data.', (err as Error).message);
     }
 });
