@@ -239,10 +239,18 @@ const ServiceCall = () => {
             <div className="mt-6 p-4 border rounded-lg bg-card-foreground">
                 <h3 className="text-xl font-semibold mb-4 text-white">Output</h3>
                 {isDataArray ? (() => {
-                    const firstRow = queryOutput[0];
-                    const allKeys = Object.keys(firstRow);
-                    const columnsToShow = allKeys.filter(key =>
-                        queryOutput.some(row => row[key] !== null && row[key] !== undefined && safeToString(row[key]).trim() !== '')
+                    const allRows = queryOutput;
+                    const allPossibleKeys = Array.from(new Set(
+                        allRows.flatMap(row => Object.keys(row))
+                    ));
+                    
+                    const columnsToShow = allPossibleKeys.filter(key =>
+                        allRows.some(row => {
+                            const value = row[key];
+                            if (value === null || value === undefined) return false;
+                            const strValue = safeToString(value).trim();
+                            return strValue !== '' && strValue.toLowerCase() !== 'null';
+                        })
                     );
 
                     if (columnsToShow.length === 0) {
