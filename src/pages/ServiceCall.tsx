@@ -150,7 +150,8 @@ const ServiceCall = () => {
             const result = await apiService.executeQuery(environment, selectedService, selectedColumns);
 
             if (result.data) {
-                setQueryOutput([result.data]);
+                const dataToSet = Array.isArray(result.data) ? result.data : [result.data];
+                setQueryOutput(dataToSet);
                 toast({
                     title: "Query Executed",
                     description: `Data fetched for ${selectedService} from ${environment}.`,
@@ -195,7 +196,8 @@ const ServiceCall = () => {
             const result = await apiService.createIntakeData(environment, selectedService);
 
             if (result.data) {
-                setQueryOutput([result.data]);
+                const dataToSet = Array.isArray(result.data) ? result.data : [result.data];
+                setQueryOutput(dataToSet);
                 toast({ title: "Data Creation Successful", description: result.message || `Intake data created and verified in ${environment}.` });
             } else if (result.message) {
                 setQueryOutput(result.message);
@@ -346,7 +348,8 @@ const ServiceCall = () => {
 
             if (result.message) {
                 if (result.data) {
-                    setQueryOutput([result.data]);
+                    const dataToSet = Array.isArray(result.data) ? result.data : [result.data];
+                    setQueryOutput(dataToSet);
                 } else {
                     setQueryOutput(result.message);
                 }
@@ -355,7 +358,8 @@ const ServiceCall = () => {
                     description: result.message,
                 });
             } else if (result.data) {
-                setQueryOutput([result.data]);
+                const dataToSet = Array.isArray(result.data) ? result.data : [result.data];
+                setQueryOutput(dataToSet);
                 toast({
                     title: "Data Created",
                     description: "Data created successfully.",
