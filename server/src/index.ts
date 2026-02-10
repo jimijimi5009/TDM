@@ -14,7 +14,6 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Constants
 const API_USER_ID = process.env.API_USER_ID;
 const API_PASSWORD = process.env.API_PASSWORD;
 const EXTERNAL_API_DOMAIN_CORE = process.env.EXTERNAL_API_DOMAIN_CORE || 'localhost:8081';
@@ -38,7 +37,6 @@ const MAX_RETRIES = 50;
 
 let oraclePool: oracledb.Pool | null = null;
 
-// Initialize Oracle connection pool
 const initializePool = async () => {
     if (!oraclePool) {
         oraclePool = await oracledb.createPool({
@@ -67,7 +65,6 @@ const getOracleConnectionString = (env: string): string => {
     return `(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=${host})(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=${hostName})))`;
 };
 
-// Create a reusable connection helper
 const executeWithConnection = async <T>(
     callback: (connection: oracledb.Connection) => Promise<T>,
     environment: string
@@ -92,14 +89,12 @@ const executeWithConnection = async <T>(
     }
 };
 
-// Standard error response
 const errorResponse = (res: Response, statusCode: number, error: string, details?: string) => {
     res.status(statusCode).json({
         error,
         ...(details && { details })
     });
 };
-
 
 app.get('/', (req: Request, res: Response) => {
   res.send('Backend server is running!');
@@ -150,7 +145,6 @@ app.get('/api/schema', async (req: Request, res: Response) => {
   }
 });
 
-// Utility functions
 const serializeOracleRow = (row: any): Record<string, any> => {
   if (row === null || row === undefined) return row;
   
@@ -188,7 +182,6 @@ const serializeOracleRow = (row: any): Record<string, any> => {
 
 const snakeToCamel = (str: string) => str.toLowerCase().replace(/_([a-z])/g, (_, l) => l.toUpperCase());
 
-// Random data generators
 const generateRandom = (length: number): string => Array(length).fill(0).map(() => Math.floor(Math.random() * 10)).join('');
 const generatePatientNumber = () => generateRandom(10);
 const generateZipCode = () => generateRandom(5);
@@ -215,7 +208,6 @@ const generateDob = (): string => {
     return `${day}-${month}-${year}`;
 };
 
-// Determine column type based on column name
 const getColumnType = (columnName: string): string => {
     const lowerName = columnName.toLowerCase();
     if (lowerName.includes('date') || lowerName.includes('dob')) return 'date';
@@ -223,7 +215,6 @@ const getColumnType = (columnName: string): string => {
     return 'text';
 };
 
-// SQL queries
 const PATIENT_DATA_QUERY = `
 SELECT tp.ZIP, tp.DOB, tp.FIRSTNAME, tp.LASTNAME, tpip.INSPHONE, tpip.SUBSCRIBERID
 FROM TBLPATIENT tp
@@ -367,7 +358,6 @@ app.post('/api/service-execute', async (req: Request, res: Response) => {
     }
 });
 
-// Helper function to create intake data with retry logic
 const createIntakeDataWithRetry = async (
     connection: oracledb.Connection,
     maxRetries: number = MAX_RETRIES
@@ -384,7 +374,6 @@ const createIntakeDataWithRetry = async (
             const dob = generateDob();
             const intakeId = String(Math.floor(Math.random() * 9000000) + 1000000);
 
-            // Insert in order with auto-commit
             await connection.execute(
                 `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`,
                 [patientNumber, intakeId, OPERATION_CENTER_CODE],

@@ -33,16 +33,16 @@ const snakeToCamel = (str: string) => {
 };
 
 const ServiceCall = () => {
-    const { toast = {} } = useToast(); // Destructure with default empty object for safety
+    const { toast = {} } = useToast();
     const [fields, setFields] = useState<DataField[]>([]);
-    const [queryOutput, setQueryOutput] = useState<Record<string, any>[] | string | null>(null); // Changed from dbQueryOutput
+    const [queryOutput, setQueryOutput] = useState<Record<string, any>[] | string | null>(null);
     const [newFieldType, setNewFieldType] = useState("names");
     const [environment, setEnvironment] = useState<string>("Q1");
     const [selectedService, setSelectedService] = useState("");
     const [dataType, setDataType] = useState("static");
     const [isLoading, setIsLoading] = useState(false);
     const [operationMode, setOperationMode] = useState<"query" | "create">("query");
-    const [isCreateConfirmOpen, setCreateConfirmOpen] = useState(false); // New state
+    const [isCreateConfirmOpen, setCreateConfirmOpen] = useState(false);
 
     const handleFetchSchema = useCallback(async (mode: "query" | "create" = "query") => {
         if (!selectedService) {
@@ -220,13 +220,11 @@ const ServiceCall = () => {
         const isErrorOrInfoString = typeof queryOutput === 'string';
         const isDataArray = Array.isArray(queryOutput) && queryOutput.length > 0;
 
-        // Helper function to safely convert values to string
         const safeToString = (value: any): string => {
             if (value === null || value === undefined) {
                 return '';
             }
             const str = String(value);
-            // Check if the conversion resulted in [object Object]
             if (str === '[object Object]') {
                 try {
                     return JSON.stringify(value);
@@ -352,7 +350,7 @@ const ServiceCall = () => {
         }
     }, [environment, selectedService, fields, toast]);
 
-    const allChecked = fields.every(f => f.checked); // <<-- This is the line that needs to move.
+    const allChecked = fields.every(f => f.checked);
 
     return (
         <>
