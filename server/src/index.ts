@@ -296,8 +296,8 @@ app.post('/api/external-call', async (req: Request, res: Response) => {
       : await externalApiResponse.text();
 
     if (!externalApiResponse.ok) {
-      const errorMessage = (typeof responseData === 'object' && responseData?.message)
-        ? responseData.message
+      const errorMessage = (typeof responseData === 'object' && responseData && 'message' in responseData)
+        ? (responseData as any).message
         : externalApiResponse.statusText;
       return errorResponse(res, externalApiResponse.status, `External API Error: ${externalApiResponse.status}`, errorMessage);
     }
@@ -359,7 +359,7 @@ app.post('/api/service-execute', async (req: Request, res: Response) => {
             environment,
             serviceType,
             selectedColumns: selectedColumnNames,
-            data: result.rows?.length > 0 ? serializeOracleRow(result.rows[0]) : null,
+            data: result.rows && result.rows.length > 0 ? serializeOracleRow(result.rows[0]) : null,
         });
 
     } catch (err) {

@@ -181,20 +181,6 @@ const ServiceCall = () => {
             setIsLoading(false);
         }
     }, [environment, selectedService, fields, toast]);
-                });
-            }
-        } catch (error) {
-            console.error("Failed to execute service query:", error);
-            setQueryOutput(JSON.stringify({ error: (error as Error).message }, null, 2));
-            toast({
-                title: "Error",
-                description: `Failed to execute service query: ${error instanceof Error ? error.message : String(error)}`,
-                variant: "destructive",
-            });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [environment, selectedService, fields, toast]);
 
     const handleCreateIntake = useCallback(async () => {
         if (!selectedService) {
