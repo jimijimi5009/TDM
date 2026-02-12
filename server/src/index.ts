@@ -339,7 +339,17 @@ app.post('/api/service-execute', async (req: Request, res: Response) => {
     }
 
     try {
-        const selectClause = selectedColumnNames.join(', ');
+        // Map of columns to their table prefixes
+        const tpipColumns = ['INSPHONE', 'SUBSCRIBERID', 'INTAKEID', 'OPERATIONCENTERCODE', 'PLANLEVELCD', 'INSFIRSTNAME', 'INSLASTNAME', 'INSDOB', 'PLANID', 'INSPATID'];
+        
+        // Prefix selected columns to avoid ambiguity
+        const prefixedColumns = selectedColumnNames.map((col: string) => {
+            const colUpper = col.toUpperCase();
+            const prefix = tpipColumns.includes(colUpper) ? 'tpip.' : 'tp.';
+            return `${prefix}${colUpper}`;
+        });
+        
+        const selectClause = prefixedColumns.join(', ');
         
         // Use 'filters' if provided, otherwise fallback to 'data' for filtering
         const activeFilters = filters || req.body.data || {};
@@ -357,7 +367,7 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
 
         // Add filter conditions if provided
         const bindParams: any[] = [];
-        console.log('DEBUG: Received filters:', JSON.stringify(activeFilters));
+        console.log('DEBUG: Active Filters:', JSON.stringify(activeFilters));
         
         if (activeFilters && Object.keys(activeFilters).length > 0) {
             let paramIndex = 1;
@@ -366,17 +376,12 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
             Object.entries(activeFilters).forEach(([col, val]: [string, any]) => {
                 if (val && String(val).trim() !== '') {
                     const colUpper = col.toUpperCase();
-                    // Map column to table
-                    let tablePrefix = 'tp.';
-                    // Columns known to be in TBLPATINTAKEPLAN
-                    const tpipColumns = ['INSPHONE', 'SUBSCRIBERID', 'INTAKEID', 'OPERATIONCENTERCODE', 'PLANLEVELCD', 'INSFIRSTNAME', 'INSLASTNAME', 'INSDOB', 'PLANID', 'INSPATID'];
+                    const tablePrefix = tpipColumns.includes(colUpper) ? 'tpip.' : 'tp.';
                     
-                    if (tpipColumns.includes(colUpper)) {
-                        tablePrefix = 'tpip.';
-                    }
-                    
-                    // Use UPPER for case-insensitive matching
+                    // Special handling for DOB/Date columns - avoid UPPER on DATE types if possible, 
+                    // but keeping it for string-based consistency if the user inputs a string.
                     const condition = `UPPER(${tablePrefix}${colUpper}) = UPPER(:${paramIndex})`;
+                    
                     console.log(`DEBUG: Adding filter condition: ${condition} with value: ${val}`);
                     filterConditions.push(condition);
                     bindParams.push(val);
