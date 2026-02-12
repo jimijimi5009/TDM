@@ -146,7 +146,7 @@ const ServiceCall = () => {
         // Build filter object from non-empty values
         const filters: Record<string, string> = {};
         fields.forEach(field => {
-            if (field.checked && field.value && String(field.value).trim() !== "") {
+            if (field.value && String(field.value).trim() !== "") {
                 filters[field.propertyName] = field.value;
             }
         });

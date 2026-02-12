@@ -341,6 +341,9 @@ app.post('/api/service-execute', async (req: Request, res: Response) => {
     try {
         const selectClause = selectedColumnNames.join(', ');
         
+        // Use 'filters' if provided, otherwise fallback to 'data' for filtering
+        const activeFilters = filters || req.body.data || {};
+        
         // Build the base query
         let query = `SELECT ${selectClause} FROM TBLPATIENT tp
 JOIN TBLPATINTAKEPLAN tpip
@@ -354,24 +357,27 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
 
         // Add filter conditions if provided
         const bindParams: any[] = [];
-        console.log('Filters object:', JSON.stringify(filters));
-        console.log('Has filters?', filters && Object.keys(filters).length > 0);
+        console.log('DEBUG: Received filters:', JSON.stringify(activeFilters));
         
-        if (filters && Object.keys(filters).length > 0) {
+        if (activeFilters && Object.keys(activeFilters).length > 0) {
             let paramIndex = 1;
             const filterConditions: string[] = [];
             
-            Object.entries(filters).forEach(([col, val]: [string, any]) => {
-                console.log(`Checking filter: ${col} = ${val}`);
+            Object.entries(activeFilters).forEach(([col, val]: [string, any]) => {
                 if (val && String(val).trim() !== '') {
                     const colUpper = col.toUpperCase();
                     // Map column to table
                     let tablePrefix = 'tp.';
-                    if (colUpper === 'INSPHONE' || colUpper === 'SUBSCRIBERID') {
+                    // Columns known to be in TBLPATINTAKEPLAN
+                    const tpipColumns = ['INSPHONE', 'SUBSCRIBERID', 'INTAKEID', 'OPERATIONCENTERCODE', 'PLANLEVELCD', 'INSFIRSTNAME', 'INSLASTNAME', 'INSDOB', 'PLANID', 'INSPATID'];
+                    
+                    if (tpipColumns.includes(colUpper)) {
                         tablePrefix = 'tpip.';
                     }
-                    const condition = `${tablePrefix}${colUpper} = :${paramIndex}`;
-                    console.log(`Adding condition: ${condition}`);
+                    
+                    // Use UPPER for case-insensitive matching
+                    const condition = `UPPER(${tablePrefix}${colUpper}) = UPPER(:${paramIndex})`;
+                    console.log(`DEBUG: Adding filter condition: ${condition} with value: ${val}`);
                     filterConditions.push(condition);
                     bindParams.push(val);
                     paramIndex++;
@@ -385,9 +391,8 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
 
         query += ` ORDER BY tp.DOB DESC FETCH FIRST 1 ROW ONLY`;
         
-        console.log('FINAL SQL QUERY:');
-        console.log(query);
-        console.log('Bind Parameters:', bindParams);
+        console.log('DEBUG: FINAL SQL QUERY:', query);
+        console.log('DEBUG: Bind Parameters:', bindParams);
 
         const result = await executeWithConnection(async (connection) => {
             return await connection.execute(query, bindParams, { outFormat: oracledb.OUT_FORMAT_OBJECT });
