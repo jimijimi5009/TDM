@@ -27,10 +27,10 @@ export const apiService = {
       `${API_ENDPOINTS.SCHEMA}?environment=${environment}&serviceType=${serviceType}`
     ),
 
-  executeQuery: (environment: string, serviceType: string, selectedColumnNames: string[]) =>
+  executeQuery: (environment: string, serviceType: string, selectedColumnNames: string[], filters?: Record<string, string>) =>
     apiFetch(API_ENDPOINTS.EXECUTE, {
       method: "POST",
-      body: { environment, serviceType, selectedColumnNames },
+      body: { environment, serviceType, selectedColumnNames, filters: filters || {} },
     }),
 
   createData: (environment: string, serviceType: string, dataFields: any[]) =>

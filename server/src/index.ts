@@ -332,7 +332,7 @@ app.get('/api/service-schema', async (req: Request, res: Response) => {
 });
 
 app.post('/api/service-execute', async (req: Request, res: Response) => {
-    const { environment, serviceType, selectedColumnNames } = req.body;
+    const { environment, serviceType, selectedColumnNames, filters = {} } = req.body;
 
     if (!environment || !serviceType || !selectedColumnNames?.length) {
         return errorResponse(res, 400, 'environment, serviceType, and selectedColumnNames array are required.');
@@ -340,16 +340,48 @@ app.post('/api/service-execute', async (req: Request, res: Response) => {
 
     try {
         const selectClause = selectedColumnNames.join(', ');
-        const fullSqlQuery = `SELECT ${selectClause} ${PATIENT_DATA_FROM_CLAUSE}`;
+        
+        // Build WHERE clause from filters
+        let filterClauses: string[] = [];
+        let bindParams: any[] = [];
+        let paramIndex = 1;
+
+        // Add filter conditions
+        Object.entries(filters).forEach(([columnName, value]) => {
+            if (value && String(value).trim() !== '') {
+                filterClauses.push(`${columnName} = :${paramIndex}`);
+                bindParams.push(value);
+                paramIndex++;
+            }
+        });
+
+        // Build the complete query with base WHERE clause and filter conditions
+        let fullSqlQuery = `SELECT ${selectClause} FROM TBLPATIENT tp
+JOIN TBLPATINTAKEPLAN tpip
+ON tp.PATIENTNUMBER = tpip.PATIENTNUMBER
+WHERE tp.ZIP IS NOT NULL
+AND tp.DOB IS NOT NULL
+AND tp.FIRSTNAME IS NOT NULL
+AND tp.LASTNAME IS NOT NULL
+AND tpip.INSPHONE IS NOT NULL
+AND tpip.SUBSCRIBERID IS NOT NULL`;
+
+        // Add filter conditions if any
+        if (filterClauses.length > 0) {
+            fullSqlQuery += ` AND ${filterClauses.join(' AND ')}`;
+        }
+
+        fullSqlQuery += ` ORDER BY tp.DOB DESC FETCH FIRST 1 ROW ONLY`;
 
         const result = await executeWithConnection(async (connection) => {
-            return await connection.execute(fullSqlQuery, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+            return await connection.execute(fullSqlQuery, bindParams, { outFormat: oracledb.OUT_FORMAT_OBJECT });
         }, environment);
 
         res.json({
             environment,
             serviceType,
             selectedColumns: selectedColumnNames,
+            filters: Object.fromEntries(Object.entries(filters).filter(([_, v]) => v && String(v).trim() !== '')),
             data: result.rows && result.rows.length > 0 ? serializeOracleRow(result.rows[0]) : null,
         });
 

@@ -61,9 +61,12 @@ const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate, isCreateMode }
             className="h-8"
           />
         ) : (
-          <span className="text-sm text-muted-foreground truncate" title={field.value}>
-            {field.value || ''}
-          </span>
+          <Input
+            value={field.value || ""}
+            onChange={(e) => onUpdate(field.id, { value: e.target.value })}
+            placeholder="Filter (optional)"
+            className="h-8"
+          />
         )}
       </div>
       

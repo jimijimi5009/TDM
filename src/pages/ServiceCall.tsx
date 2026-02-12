@@ -143,11 +143,19 @@ const ServiceCall = () => {
             return;
         }
 
+        // Build filter object from non-empty values
+        const filters: Record<string, string> = {};
+        fields.forEach(field => {
+            if (field.checked && field.value && String(field.value).trim() !== "") {
+                filters[field.propertyName] = field.value;
+            }
+        });
+
         setIsLoading(true);
         setQueryOutput(null);
 
         try {
-            const result = await apiService.executeQuery(environment, selectedService, selectedColumns);
+            const result = await apiService.executeQuery(environment, selectedService, selectedColumns, filters);
 
             if (result.data) {
                 const dataToSet = Array.isArray(result.data) ? result.data : [result.data];
