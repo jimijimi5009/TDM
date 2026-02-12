@@ -354,11 +354,15 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
 
         // Add filter conditions if provided
         const bindParams: any[] = [];
+        console.log('Filters object:', JSON.stringify(filters));
+        console.log('Has filters?', filters && Object.keys(filters).length > 0);
+        
         if (filters && Object.keys(filters).length > 0) {
             let paramIndex = 1;
             const filterConditions: string[] = [];
             
             Object.entries(filters).forEach(([col, val]: [string, any]) => {
+                console.log(`Checking filter: ${col} = ${val}`);
                 if (val && String(val).trim() !== '') {
                     const colUpper = col.toUpperCase();
                     // Map column to table
@@ -366,7 +370,9 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
                     if (colUpper === 'INSPHONE' || colUpper === 'SUBSCRIBERID') {
                         tablePrefix = 'tpip.';
                     }
-                    filterConditions.push(`${tablePrefix}${colUpper} = :${paramIndex}`);
+                    const condition = `${tablePrefix}${colUpper} = :${paramIndex}`;
+                    console.log(`Adding condition: ${condition}`);
+                    filterConditions.push(condition);
                     bindParams.push(val);
                     paramIndex++;
                 }
@@ -378,6 +384,10 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
         }
 
         query += ` ORDER BY tp.DOB DESC FETCH FIRST 1 ROW ONLY`;
+        
+        console.log('FINAL SQL QUERY:');
+        console.log(query);
+        console.log('Bind Parameters:', bindParams);
 
         const result = await executeWithConnection(async (connection) => {
             return await connection.execute(query, bindParams, { outFormat: oracledb.OUT_FORMAT_OBJECT });
