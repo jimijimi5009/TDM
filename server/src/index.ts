@@ -100,11 +100,6 @@ app.get('/', (req: Request, res: Response) => {
   res.send('Backend server is running!');
 });
 
-app.get('/api/test', (req: Request, res: Response) => {
-  console.log('=== TEST ENDPOINT HIT ===');
-  res.json({ status: 'test working' });
-});
-
 app.get('/api/schema', async (req: Request, res: Response) => {
   const { environment, tableName } = req.query;
 
@@ -336,26 +331,8 @@ app.get('/api/service-schema', async (req: Request, res: Response) => {
     }
 });
 
-// Column to table alias mapping for proper SQL filtering
-const COLUMN_TABLE_MAP: Record<string, string> = {
-    zip: 'tp',
-    dob: 'tp',
-    firstname: 'tp',
-    lastname: 'tp',
-    insphone: 'tpip',
-    subscriberid: 'tpip',
-};
-
 app.post('/api/service-execute', async (req: Request, res: Response) => {
-    console.log('=== ENDPOINT HIT ===');
-    const { environment, serviceType, selectedColumnNames, filters = {} } = req.body;
-
-    console.log('=== SERVICE EXECUTE REQUEST ===');
-    console.log('Environment:', environment);
-    console.log('Service Type:', serviceType);
-    console.log('Selected Columns:', selectedColumnNames);
-    console.log('Filters Received:', JSON.stringify(filters));
-    console.log('Filters Keys:', Object.keys(filters));
+    const { environment, serviceType, selectedColumnNames, filters } = req.body;
 
     if (!environment || !serviceType || !selectedColumnNames?.length) {
         return errorResponse(res, 400, 'environment, serviceType, and selectedColumnNames array are required.');
@@ -364,30 +341,8 @@ app.post('/api/service-execute', async (req: Request, res: Response) => {
     try {
         const selectClause = selectedColumnNames.join(', ');
         
-        // Build WHERE clause from filters with proper table alias mapping
-        let filterClauses: string[] = [];
-        let bindParams: any[] = [];
-        let paramIndex = 1;
-
-        // Add filter conditions with correct table aliases
-        Object.entries(filters).forEach(([columnName, value]) => {
-            console.log(`Processing filter: ${columnName} = ${value}`);
-            if (value && String(value).trim() !== '') {
-                const columnLower = columnName.toLowerCase();
-                const tableAlias = COLUMN_TABLE_MAP[columnLower] || 'tp';
-                const filterClause = `${tableAlias}.${columnName.toUpperCase()} = :${paramIndex}`;
-                console.log(`Adding filter clause: ${filterClause}`);
-                filterClauses.push(filterClause);
-                bindParams.push(value);
-                paramIndex++;
-            }
-        });
-
-        console.log('Final Filter Clauses:', filterClauses);
-        console.log('Bind Parameters:', bindParams);
-
-        // Build the complete query with base WHERE clause and filter conditions
-        let fullSqlQuery = `SELECT ${selectClause} FROM TBLPATIENT tp
+        // Build the base query
+        let query = `SELECT ${selectClause} FROM TBLPATIENT tp
 JOIN TBLPATINTAKEPLAN tpip
 ON tp.PATIENTNUMBER = tpip.PATIENTNUMBER
 WHERE tp.ZIP IS NOT NULL
@@ -397,31 +352,45 @@ AND tp.LASTNAME IS NOT NULL
 AND tpip.INSPHONE IS NOT NULL
 AND tpip.SUBSCRIBERID IS NOT NULL`;
 
-        // Add filter conditions if any
-        if (filterClauses.length > 0) {
-            fullSqlQuery += ` AND ${filterClauses.join(' AND ')}`;
+        // Add filter conditions if provided
+        const bindParams: any[] = [];
+        if (filters && Object.keys(filters).length > 0) {
+            let paramIndex = 1;
+            const filterConditions: string[] = [];
+            
+            Object.entries(filters).forEach(([col, val]: [string, any]) => {
+                if (val && String(val).trim() !== '') {
+                    const colUpper = col.toUpperCase();
+                    // Map column to table
+                    let tablePrefix = 'tp.';
+                    if (colUpper === 'INSPHONE' || colUpper === 'SUBSCRIBERID') {
+                        tablePrefix = 'tpip.';
+                    }
+                    filterConditions.push(`${tablePrefix}${colUpper} = :${paramIndex}`);
+                    bindParams.push(val);
+                    paramIndex++;
+                }
+            });
+            
+            if (filterConditions.length > 0) {
+                query += ` AND ${filterConditions.join(' AND ')}`;
+            }
         }
 
-        fullSqlQuery += ` ORDER BY tp.DOB DESC FETCH FIRST 1 ROW ONLY`;
-
-        console.log('Generated SQL:', fullSqlQuery);
+        query += ` ORDER BY tp.DOB DESC FETCH FIRST 1 ROW ONLY`;
 
         const result = await executeWithConnection(async (connection) => {
-            return await connection.execute(fullSqlQuery, bindParams, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+            return await connection.execute(query, bindParams, { outFormat: oracledb.OUT_FORMAT_OBJECT });
         }, environment);
-
-        console.log('Query Result Rows:', result.rows?.length);
 
         res.json({
             environment,
             serviceType,
             selectedColumns: selectedColumnNames,
-            filters: Object.fromEntries(Object.entries(filters).filter(([_, v]) => v && String(v).trim() !== '')),
             data: result.rows && result.rows.length > 0 ? serializeOracleRow(result.rows[0]) : null,
         });
 
     } catch (err) {
-        console.error('Error in service-execute:', err);
         errorResponse(res, 500, 'Failed to execute service query.', (err as Error).message);
     }
 });
