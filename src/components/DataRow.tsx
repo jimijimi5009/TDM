@@ -21,9 +21,48 @@ interface DataRowProps {
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
   isCreateMode: boolean;
+  isIntakeMode?: boolean;
 }
 
-const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate, isCreateMode }: DataRowProps) => {
+const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate, isCreateMode, isIntakeMode }: DataRowProps) => {
+  if (isIntakeMode) {
+    return (
+      <div className="data-row animate-fade-in group flex items-center gap-4 px-4 py-3 bg-card hover:bg-muted/50 border-b border-border transition-colors">
+        <div className="flex-1 text-sm font-medium text-foreground">
+          {field.propertyName}
+        </div>
+        
+        <div className="flex-1">
+          <Input
+            value={field.value || ""}
+            onChange={(e) => onUpdate(field.id, { value: e.target.value })}
+            placeholder="Leave empty for random data"
+            className="h-8"
+          />
+        </div>
+        
+        <div className="flex items-center gap-1 w-20">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            onClick={() => onDuplicate(field.id)}
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            onClick={() => onDelete(field.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="data-row animate-fade-in group">
       <button className="cursor-grab text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity">

@@ -456,18 +456,40 @@ const ServiceCall = () => {
                             </div>
 
                             <div className="flex items-center gap-4 px-4 py-3 rounded-t-lg bg-table-header text-table-header-text text-sm font-medium mb-2">
-                                <div className="w-4" />
-                                <Checkbox
-                                    checked={allChecked}
-                                    onCheckedChange={toggleAll}
-                                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                />
-                                <span className="w-8">All</span>
-                                <span className="w-[180px]">Data Type</span>
-                                <span className="w-[140px]">Property Name</span>
-                                <span className="w-[160px]">Actual Data</span>
-                                <span className="ml-auto">Actions</span>
+                                {operationMode === "create-intake" ? (
+                                    <>
+                                        <span className="flex-1">Column Name</span>
+                                        <span className="flex-1">Value (Optional - Random if Empty)</span>
+                                        <span className="w-20">Actions</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="w-4" />
+                                        <Checkbox
+                                            checked={allChecked}
+                                            onCheckedChange={toggleAll}
+                                            className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                        />
+                                        <span className="w-8">All</span>
+                                        <span className="w-[180px]">Data Type</span>
+                                        <span className="w-[140px]">Property Name</span>
+                                        <span className="w-[160px]">Actual Data</span>
+                                        <span className="ml-auto">Actions</span>
+                                    </>
+                                )}
                             </div>
+                            
+                            {operationMode !== "create-intake" && (
+                                <div className="text-xs text-muted-foreground px-4 mb-2">
+                                    Select columns to use in your query. Use filters to narrow results.
+                                </div>
+                            )}
+                            
+                            {operationMode === "create-intake" && (
+                                <div className="text-xs text-muted-foreground px-4 mb-2">
+                                    Enter values for the fields you want to customize. Empty fields will use random data.
+                                </div>
+                            )}
                             
                             <div className="space-y-0 mb-4">
                                 {fields.map((field, index) => (
@@ -479,6 +501,7 @@ const ServiceCall = () => {
                                         onDelete={deleteField}
                                         onDuplicate={duplicateField}
                                         isCreateMode={operationMode === "create" || operationMode === "create-intake"}
+                                        isIntakeMode={operationMode === "create-intake"}
                                     />
                                 ))}
                             </div>
