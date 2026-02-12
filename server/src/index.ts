@@ -380,17 +380,17 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
             const filterConditions: string[] = [];
             
             Object.entries(activeFilters).forEach(([col, val]: [string, any]) => {
-                if (val && String(val).trim() !== '') {
+                const trimmedVal = String(val).trim();
+                if (trimmedVal !== '') {
                     const colUpper = col.toUpperCase();
                     const tablePrefix = tpipColumns.includes(colUpper) ? 'tpip.' : 'tp.';
                     
-                    // Special handling for DOB/Date columns - avoid UPPER on DATE types if possible, 
-                    // but keeping it for string-based consistency if the user inputs a string.
-                    const condition = `UPPER(${tablePrefix}${colUpper}) = UPPER(:${paramIndex})`;
+                    // Use LIKE for more flexible matching (handles trailing spaces)
+                    const condition = `UPPER(${tablePrefix}${colUpper}) LIKE UPPER(:${paramIndex})`;
                     
-                    console.log(`DEBUG: Adding filter condition: ${condition} with value: ${val}`);
+                    console.log(`DEBUG: Applying Filter -> ${condition} [Value: %${trimmedVal}%]`);
                     filterConditions.push(condition);
-                    bindParams.push(val);
+                    bindParams.push(`%${trimmedVal}%`);
                     paramIndex++;
                 }
             });
@@ -405,7 +405,8 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
         console.log('DEBUG: FINAL SQL QUERY:', query);
         console.log('DEBUG: Bind Parameters:', bindParams);
 
-        lastExecutedQuery = { query, params: bindParams };
+        const debugInfo = { query, params: bindParams };
+        lastExecutedQuery = debugInfo;
 
         const result = await executeWithConnection(async (connection) => {
             return await connection.execute(query, bindParams, { outFormat: oracledb.OUT_FORMAT_OBJECT });
@@ -416,6 +417,7 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
             serviceType,
             selectedColumns: selectedColumnNames,
             data: result.rows && result.rows.length > 0 ? serializeOracleRow(result.rows[0]) : null,
+            _debug: debugInfo // Return debug info in the response
         });
 
     } catch (err) {
