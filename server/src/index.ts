@@ -331,6 +331,16 @@ app.get('/api/service-schema', async (req: Request, res: Response) => {
     }
 });
 
+// Column to table alias mapping for proper SQL filtering
+const COLUMN_TABLE_MAP: Record<string, string> = {
+    zip: 'tp',
+    dob: 'tp',
+    firstname: 'tp',
+    lastname: 'tp',
+    insphone: 'tpip',
+    subscriberid: 'tpip',
+};
+
 app.post('/api/service-execute', async (req: Request, res: Response) => {
     const { environment, serviceType, selectedColumnNames, filters = {} } = req.body;
 
@@ -341,15 +351,17 @@ app.post('/api/service-execute', async (req: Request, res: Response) => {
     try {
         const selectClause = selectedColumnNames.join(', ');
         
-        // Build WHERE clause from filters
+        // Build WHERE clause from filters with proper table alias mapping
         let filterClauses: string[] = [];
         let bindParams: any[] = [];
         let paramIndex = 1;
 
-        // Add filter conditions
+        // Add filter conditions with correct table aliases
         Object.entries(filters).forEach(([columnName, value]) => {
             if (value && String(value).trim() !== '') {
-                filterClauses.push(`${columnName} = :${paramIndex}`);
+                const columnLower = columnName.toLowerCase();
+                const tableAlias = COLUMN_TABLE_MAP[columnLower] || 'tp';
+                filterClauses.push(`${tableAlias}.${columnName.toUpperCase()} = :${paramIndex}`);
                 bindParams.push(value);
                 paramIndex++;
             }
