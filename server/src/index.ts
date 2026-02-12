@@ -497,24 +497,6 @@ const createIntakeDataWithRetry = async (
                 return "";
             };
             
-            // Validate numeric fields
-            const validateNumeric = (value: string, fieldName: string): boolean => {
-                if (!value) return true; // Allow empty for generation
-                if (!/^\d+$/.test(value)) {
-                    throw new Error(`${fieldName} must contain only numbers, got: "${value}"`);
-                }
-                return true;
-            };
-            
-            // Validate text fields
-            const validateText = (value: string, fieldName: string): boolean => {
-                if (!value) return true; // Allow empty for generation
-                if (value.length === 0) {
-                    throw new Error(`${fieldName} cannot be empty`);
-                }
-                return true;
-            };
-            
             const firstName = getFieldValue(['FIRSTNAME', 'firstname']) || generateRandomName('FIRST');
             const lastName = getFieldValue(['LASTNAME', 'lastname']) || generateRandomName('LAST');
             const phone = getFieldValue(['INSPHONE', 'insphone']) || generatePhoneNumber();
@@ -523,17 +505,11 @@ const createIntakeDataWithRetry = async (
             const intakeId = getFieldValue(['INTAKEID', 'intakeid']) || String(Math.floor(Math.random() * 9000000) + 1000000);
             const subscriberId = getFieldValue(['SUBSCRIBERID', 'subscriberid']) || generateSubscriberId();
             
-            // Get customizable fixed fields with validation
-            let operationCenterCode = getFieldValue(['OPERATIONCENTERCODE', 'operationcentercode']) || OPERATION_CENTER_CODE;
-            let planLevelCd = getFieldValue(['PLANLEVELCD', 'planlevelcd']) || PLAN_LEVEL_CD;
-            let planId = getFieldValue(['PLANID', 'planid']) || FIXED_PLAN_ID;
-            let insPatId = getFieldValue(['INSPATID', 'inspatid']) || FIXED_INS_PAT_ID;
-            
-            // Validate data types
-            validateText(operationCenterCode, 'OPERATIONCENTERCODE');
-            validateNumeric(planLevelCd, 'PLANLEVELCD');
-            validateNumeric(planId, 'PLANID');
-            validateText(insPatId, 'INSPATID');
+            // Get customizable fixed fields (fallback to constants if not provided)
+            const operationCenterCode = getFieldValue(['OPERATIONCENTERCODE', 'operationcentercode']) || OPERATION_CENTER_CODE;
+            const planLevelCd = getFieldValue(['PLANLEVELCD', 'planlevelcd']) || PLAN_LEVEL_CD;
+            const planId = getFieldValue(['PLANID', 'planid']) || FIXED_PLAN_ID;
+            const insPatId = getFieldValue(['INSPATID', 'inspatid']) || FIXED_INS_PAT_ID;
 
             await connection.execute(
                 `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`,
