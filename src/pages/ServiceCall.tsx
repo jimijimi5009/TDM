@@ -151,10 +151,14 @@ const ServiceCall = () => {
             }
         });
 
+        console.log('DEBUG: Built filters object:', filters);
+        console.log('DEBUG: All fields:', fields);
+
         setIsLoading(true);
         setQueryOutput(null);
 
         try {
+            console.log('DEBUG: Calling executeQuery with filters:', filters);
             const result = await apiService.executeQuery(environment, selectedService, selectedColumns, filters);
 
             if (result.data) {
