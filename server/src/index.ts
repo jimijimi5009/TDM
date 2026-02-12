@@ -100,6 +100,11 @@ app.get('/', (req: Request, res: Response) => {
   res.send('Backend server is running!');
 });
 
+app.get('/api/test', (req: Request, res: Response) => {
+  console.log('=== TEST ENDPOINT HIT ===');
+  res.json({ status: 'test working' });
+});
+
 app.get('/api/schema', async (req: Request, res: Response) => {
   const { environment, tableName } = req.query;
 
