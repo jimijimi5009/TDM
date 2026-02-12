@@ -342,13 +342,14 @@ const COLUMN_TABLE_MAP: Record<string, string> = {
 };
 
 app.post('/api/service-execute', async (req: Request, res: Response) => {
+    console.log('=== ENDPOINT HIT ===');
     const { environment, serviceType, selectedColumnNames, filters = {} } = req.body;
 
     console.log('=== SERVICE EXECUTE REQUEST ===');
     console.log('Environment:', environment);
     console.log('Service Type:', serviceType);
     console.log('Selected Columns:', selectedColumnNames);
-    console.log('Filters Received:', filters);
+    console.log('Filters Received:', JSON.stringify(filters));
     console.log('Filters Keys:', Object.keys(filters));
 
     if (!environment || !serviceType || !selectedColumnNames?.length) {
