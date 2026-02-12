@@ -427,19 +427,23 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
 
 const createIntakeDataWithRetry = async (
     connection: oracledb.Connection,
-    maxRetries: number = MAX_RETRIES
+    maxRetries: number = MAX_RETRIES,
+    userData?: Record<string, any>
 ): Promise<{ success: boolean; verificationData: any }> => {
     let success = false;
     let verificationData: any = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
+            // Use user-provided data or generate random data as fallback
             const patientNumber = generatePatientNumber();
-            const firstName = generateRandomName('FIRST');
-            const lastName = generateRandomName('LAST');
-            const phone = generatePhoneNumber();
-            const dob = generateDob();
-            const intakeId = String(Math.floor(Math.random() * 9000000) + 1000000);
+            const firstName = userData?.FIRSTNAME && String(userData.FIRSTNAME).trim() ? String(userData.FIRSTNAME).trim() : generateRandomName('FIRST');
+            const lastName = userData?.LASTNAME && String(userData.LASTNAME).trim() ? String(userData.LASTNAME).trim() : generateRandomName('LAST');
+            const phone = userData?.INSPHONE && String(userData.INSPHONE).trim() ? String(userData.INSPHONE).trim() : generatePhoneNumber();
+            const dob = userData?.DOB && String(userData.DOB).trim() ? String(userData.DOB).trim() : generateDob();
+            const zip = userData?.ZIP && String(userData.ZIP).trim() ? String(userData.ZIP).trim() : generateZipCode();
+            const intakeId = userData?.INTAKEID && String(userData.INTAKEID).trim() ? String(userData.INTAKEID).trim() : String(Math.floor(Math.random() * 9000000) + 1000000);
+            const subscriberId = userData?.SUBSCRIBERID && String(userData.SUBSCRIBERID).trim() ? String(userData.SUBSCRIBERID).trim() : generateSubscriberId();
 
             await connection.execute(
                 `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`,
@@ -448,14 +452,14 @@ const createIntakeDataWithRetry = async (
             );
 
             await connection.execute(
-                `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASTNAME, INSPHONE, INSDOB, PLANID, INSPATID) VALUES (:1, :2, :3, :4, :5, :6, :7, TO_DATE(:8, 'DD-MON-YY'), :9, :10)`,
-                [patientNumber, intakeId, OPERATION_CENTER_CODE, PLAN_LEVEL_CD, firstName, lastName, phone, dob, FIXED_PLAN_ID, FIXED_INS_PAT_ID],
+                `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASTNAME, INSPHONE, INSDOB, PLANID, INSPATID, SUBSCRIBERID) VALUES (:1, :2, :3, :4, :5, :6, :7, TO_DATE(:8, 'DD-MON-YY'), :9, :10, :11)`,
+                [patientNumber, intakeId, OPERATION_CENTER_CODE, PLAN_LEVEL_CD, firstName, lastName, phone, dob, FIXED_PLAN_ID, FIXED_INS_PAT_ID, subscriberId],
                 { autoCommit: true }
             );
 
             await connection.execute(
-                `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD-MON-YY'))`,
-                [patientNumber, firstName, lastName, phone, dob],
+                `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB, ZIP) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD-MON-YY'), :6)`,
+                [patientNumber, firstName, lastName, phone, dob, zip],
                 { autoCommit: true }
             );
 
@@ -483,15 +487,24 @@ const createIntakeDataWithRetry = async (
 };
 
 app.post('/api/create-intake-data', async (req: Request, res: Response) => {
-    const { environment, serviceType } = req.body;
+    const { environment, serviceType, dataFields } = req.body;
 
     if (!environment || !serviceType) {
         return errorResponse(res, 400, 'environment and serviceType are required.');
     }
 
     try {
+        // Convert dataFields array to an object for easier lookup
+        // dataFields format: [{ FIRSTNAME: 'value' }, { LASTNAME: 'value' }, ...]
+        const userData: Record<string, any> = {};
+        if (dataFields && Array.isArray(dataFields)) {
+            dataFields.forEach((field: Record<string, any>) => {
+                Object.assign(userData, field);
+            });
+        }
+
         const result = await executeWithConnection(async (connection) => {
-            return await createIntakeDataWithRetry(connection);
+            return await createIntakeDataWithRetry(connection, MAX_RETRIES, userData);
         }, environment);
 
         if (result.success) {
@@ -516,8 +529,14 @@ app.post('/api/service-create', async (req: Request, res: Response) => {
     }
 
     try {
+        // Convert dataFields array to an object for easier lookup
+        const userData: Record<string, any> = {};
+        dataFields.forEach((field: Record<string, any>) => {
+            Object.assign(userData, field);
+        });
+
         const result = await executeWithConnection(async (connection) => {
-            return await createIntakeDataWithRetry(connection, 5);
+            return await createIntakeDataWithRetry(connection, 5, userData);
         }, environment);
 
         if (result.success) {

@@ -39,9 +39,9 @@ export const apiService = {
       body: { environment, serviceType, dataFields },
     }),
 
-  createIntakeData: (environment: string, serviceType: string) =>
+  createIntakeData: (environment: string, serviceType: string, dataFields?: Record<string, any>) =>
     apiFetch(API_ENDPOINTS.CREATE_INTAKE, {
       method: "POST",
-      body: { environment, serviceType },
+      body: { environment, serviceType, ...(dataFields && { dataFields }) },
     }),
 };

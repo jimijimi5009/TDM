@@ -33,7 +33,7 @@ const snakeToCamel = (str: string) => {
 };
 
 const ServiceCall = () => {
-    const { toast = {} } = useToast();
+    const { toast } = useToast();
     const [fields, setFields] = useState<DataField[]>([]);
     const [queryOutput, setQueryOutput] = useState<Record<string, any>[] | string | null>(null);
     const [newFieldType, setNewFieldType] = useState("names");
@@ -41,10 +41,10 @@ const ServiceCall = () => {
     const [selectedService, setSelectedService] = useState("");
     const [dataType, setDataType] = useState("static");
     const [isLoading, setIsLoading] = useState(false);
-    const [operationMode, setOperationMode] = useState<"query" | "create">("query");
+    const [operationMode, setOperationMode] = useState<"query" | "create" | "create-intake">("query");
     const [isCreateConfirmOpen, setCreateConfirmOpen] = useState(false);
 
-    const handleFetchSchema = useCallback(async (mode: "query" | "create" = "query") => {
+    const handleFetchSchema = useCallback(async (mode: "query" | "create" | "create-intake" = "query") => {
         if (!selectedService) {
             toast({
                 title: "Service Type Required",
@@ -205,7 +205,21 @@ const ServiceCall = () => {
         setQueryOutput(null);
 
         try {
-            const result = await apiService.createIntakeData(environment, selectedService);
+            // Build dataFields object from fields - include empty values as fallback for random generation
+            const dataFields: Record<string, any>[] = [];
+            fields.filter(f => f.checked).forEach(field => {
+                dataFields.push({
+                    [field.propertyName]: field.value || "",
+                });
+            });
+
+            console.log('DEBUG: Intake dataFields:', dataFields);
+
+            const result = await apiService.createIntakeData(
+                environment,
+                selectedService,
+                dataFields.length > 0 ? dataFields : undefined
+            );
 
             if (result.data) {
                 const dataToSet = Array.isArray(result.data) ? result.data : [result.data];
@@ -226,7 +240,7 @@ const ServiceCall = () => {
             setIsLoading(false);
             setCreateConfirmOpen(false);
         }
-    }, [environment, selectedService, toast]);
+    }, [environment, selectedService, fields, toast]);
 
     const renderOutput = () => {
         if (!queryOutput) return null;
@@ -464,7 +478,7 @@ const ServiceCall = () => {
                                         onUpdate={updateField}
                                         onDelete={deleteField}
                                         onDuplicate={duplicateField}
-                                        isCreateMode={operationMode === "create"}
+                                        isCreateMode={operationMode === "create" || operationMode === "create-intake"}
                                     />
                                 ))}
                             </div>
@@ -515,14 +529,26 @@ const ServiceCall = () => {
                                 {isLoading ? "Creating..." : "Create Data"}
                             </Button>
                         )}
-                        {/* New "Create Intake Data" button for independent flow */}
-                        <Button
-                            onClick={() => setCreateConfirmOpen(true)}
-                            disabled={isLoading || !selectedService}
-                            className="w-full bg-green-500 hover:bg-green-600 text-primary-foreground py-2 rounded mt-2"
-                        >
-                            {isLoading ? "Processing..." : "Create Intake Data"} <Plus className="h-4 w-4 ml-2"/>
-                        </Button>
+
+                        <div className="flex gap-2 mt-4">
+                            <Button
+                                onClick={() => handleFetchSchema("create-intake")}
+                                variant="outline"
+                                size="sm"
+                                disabled={!selectedService || isLoading}
+                                className="flex-1"
+                            >
+                                Fetch Schema for Intake <Database className="h-4 w-4 ml-1" />
+                            </Button>
+                            <Button
+                                onClick={() => setCreateConfirmOpen(true)}
+                                disabled={isLoading || !selectedService}
+                                className="flex-1 bg-green-500 hover:bg-green-600 text-primary-foreground py-2 rounded"
+                            >
+                                {isLoading ? "Processing..." : "Create Intake Data"} <Plus className="h-4 w-4 ml-2"/>
+                            </Button>
+                        </div>
+
                         {renderOutput()}
                     </div>
                 </main>
@@ -531,9 +557,11 @@ const ServiceCall = () => {
             <AlertDialog open={isCreateConfirmOpen} onOpenChange={setCreateConfirmOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogTitle>Create Intake Data</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will create a new patient and intake record with randomly generated data in the '{environment}' environment. Do you want to continue?
+                            {fields.length > 0
+                                ? `This will create a new patient and intake record in the '${environment}' environment. For empty fields, random data will be generated. Continue?`
+                                : `This will create a new patient and intake record with randomly generated data in the '${environment}' environment. Do you want to continue?`}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
