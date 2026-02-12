@@ -331,6 +331,12 @@ app.get('/api/service-schema', async (req: Request, res: Response) => {
     }
 });
 
+let lastExecutedQuery: { query: string, params: any[] } | null = null;
+
+app.get('/api/debug-query', (req: Request, res: Response) => {
+    res.json(lastExecutedQuery || { message: "No query executed yet." });
+});
+
 app.post('/api/service-execute', async (req: Request, res: Response) => {
     const { environment, serviceType, selectedColumnNames, filters } = req.body;
 
@@ -398,6 +404,8 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
         
         console.log('DEBUG: FINAL SQL QUERY:', query);
         console.log('DEBUG: Bind Parameters:', bindParams);
+
+        lastExecutedQuery = { query, params: bindParams };
 
         const result = await executeWithConnection(async (connection) => {
             return await connection.execute(query, bindParams, { outFormat: oracledb.OUT_FORMAT_OBJECT });
