@@ -344,6 +344,13 @@ const COLUMN_TABLE_MAP: Record<string, string> = {
 app.post('/api/service-execute', async (req: Request, res: Response) => {
     const { environment, serviceType, selectedColumnNames, filters = {} } = req.body;
 
+    console.log('=== SERVICE EXECUTE REQUEST ===');
+    console.log('Environment:', environment);
+    console.log('Service Type:', serviceType);
+    console.log('Selected Columns:', selectedColumnNames);
+    console.log('Filters Received:', filters);
+    console.log('Filters Keys:', Object.keys(filters));
+
     if (!environment || !serviceType || !selectedColumnNames?.length) {
         return errorResponse(res, 400, 'environment, serviceType, and selectedColumnNames array are required.');
     }
@@ -358,14 +365,20 @@ app.post('/api/service-execute', async (req: Request, res: Response) => {
 
         // Add filter conditions with correct table aliases
         Object.entries(filters).forEach(([columnName, value]) => {
+            console.log(`Processing filter: ${columnName} = ${value}`);
             if (value && String(value).trim() !== '') {
                 const columnLower = columnName.toLowerCase();
                 const tableAlias = COLUMN_TABLE_MAP[columnLower] || 'tp';
-                filterClauses.push(`${tableAlias}.${columnName.toUpperCase()} = :${paramIndex}`);
+                const filterClause = `${tableAlias}.${columnName.toUpperCase()} = :${paramIndex}`;
+                console.log(`Adding filter clause: ${filterClause}`);
+                filterClauses.push(filterClause);
                 bindParams.push(value);
                 paramIndex++;
             }
         });
+
+        console.log('Final Filter Clauses:', filterClauses);
+        console.log('Bind Parameters:', bindParams);
 
         // Build the complete query with base WHERE clause and filter conditions
         let fullSqlQuery = `SELECT ${selectClause} FROM TBLPATIENT tp
@@ -385,9 +398,13 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
 
         fullSqlQuery += ` ORDER BY tp.DOB DESC FETCH FIRST 1 ROW ONLY`;
 
+        console.log('Generated SQL:', fullSqlQuery);
+
         const result = await executeWithConnection(async (connection) => {
             return await connection.execute(fullSqlQuery, bindParams, { outFormat: oracledb.OUT_FORMAT_OBJECT });
         }, environment);
+
+        console.log('Query Result Rows:', result.rows?.length);
 
         res.json({
             environment,
@@ -398,6 +415,7 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
         });
 
     } catch (err) {
+        console.error('Error in service-execute:', err);
         errorResponse(res, 500, 'Failed to execute service query.', (err as Error).message);
     }
 });
