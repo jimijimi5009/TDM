@@ -312,13 +312,27 @@ app.get('/api/service-schema', async (req: Request, res: Response) => {
             return await connection.execute(PATIENT_DATA_QUERY, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
         }, environment as string);
 
-        const schemaFields = result.metaData?.map((col: oracledb.Metadata<any>, index: number) => ({
+        let schemaFields = result.metaData?.map((col: oracledb.Metadata<any>, index: number) => ({
             id: `${index}-${col.name}`,
             type: getColumnType(col.name),
             propertyName: snakeToCamel(col.name),
             option: "",
             checked: true,
-        }));
+        })) || [];
+
+        // Add additional intake-specific fields that can be customized
+        const intakeSpecificFields = [
+            {
+                id: `intake-intakeid`,
+                type: 'text',
+                propertyName: 'intakeid',
+                option: "",
+                checked: true,
+            },
+        ];
+
+        // Append intake-specific fields to schema
+        schemaFields = [...schemaFields, ...intakeSpecificFields];
 
         res.json({
             environment,
@@ -437,13 +451,19 @@ const createIntakeDataWithRetry = async (
         try {
             // Use user-provided data or generate random data as fallback
             const patientNumber = generatePatientNumber();
-            const firstName = userData?.FIRSTNAME && String(userData.FIRSTNAME).trim() ? String(userData.FIRSTNAME).trim() : generateRandomName('FIRST');
-            const lastName = userData?.LASTNAME && String(userData.LASTNAME).trim() ? String(userData.LASTNAME).trim() : generateRandomName('LAST');
-            const phone = userData?.INSPHONE && String(userData.INSPHONE).trim() ? String(userData.INSPHONE).trim() : generatePhoneNumber();
-            const dob = userData?.DOB && String(userData.DOB).trim() ? String(userData.DOB).trim() : generateDob();
-            const zip = userData?.ZIP && String(userData.ZIP).trim() ? String(userData.ZIP).trim() : generateZipCode();
-            const intakeId = userData?.INTAKEID && String(userData.INTAKEID).trim() ? String(userData.INTAKEID).trim() : String(Math.floor(Math.random() * 9000000) + 1000000);
-            const subscriberId = userData?.SUBSCRIBERID && String(userData.SUBSCRIBERID).trim() ? String(userData.SUBSCRIBERID).trim() : generateSubscriberId();
+            
+            // Handle both camelCase and UPPERCASE field names
+            const getFieldValue = (camelCase: string, uppercase: string) => {
+                return userData?.[uppercase] || userData?.[camelCase] || "";
+            };
+            
+            const firstName = getFieldValue('firstname', 'FIRSTNAME') && String(getFieldValue('firstname', 'FIRSTNAME')).trim() ? String(getFieldValue('firstname', 'FIRSTNAME')).trim() : generateRandomName('FIRST');
+            const lastName = getFieldValue('lastname', 'LASTNAME') && String(getFieldValue('lastname', 'LASTNAME')).trim() ? String(getFieldValue('lastname', 'LASTNAME')).trim() : generateRandomName('LAST');
+            const phone = getFieldValue('insphone', 'INSPHONE') && String(getFieldValue('insphone', 'INSPHONE')).trim() ? String(getFieldValue('insphone', 'INSPHONE')).trim() : generatePhoneNumber();
+            const dob = getFieldValue('dob', 'DOB') && String(getFieldValue('dob', 'DOB')).trim() ? String(getFieldValue('dob', 'DOB')).trim() : generateDob();
+            const zip = getFieldValue('zip', 'ZIP') && String(getFieldValue('zip', 'ZIP')).trim() ? String(getFieldValue('zip', 'ZIP')).trim() : generateZipCode();
+            const intakeId = getFieldValue('intakeid', 'INTAKEID') && String(getFieldValue('intakeid', 'INTAKEID')).trim() ? String(getFieldValue('intakeid', 'INTAKEID')).trim() : String(Math.floor(Math.random() * 9000000) + 1000000);
+            const subscriberId = getFieldValue('subscriberId', 'SUBSCRIBERID') && String(getFieldValue('subscriberId', 'SUBSCRIBERID')).trim() ? String(getFieldValue('subscriberId', 'SUBSCRIBERID')).trim() : generateSubscriberId();
 
             await connection.execute(
                 `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`,
