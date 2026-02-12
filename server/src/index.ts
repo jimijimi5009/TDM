@@ -318,6 +318,7 @@ app.get('/api/service-schema', async (req: Request, res: Response) => {
             propertyName: snakeToCamel(col.name),
             option: "",
             checked: true,
+            example: "",
         })) || [];
 
         // Add additional intake-specific fields that can be customized
@@ -328,6 +329,39 @@ app.get('/api/service-schema', async (req: Request, res: Response) => {
                 propertyName: 'intakeid',
                 option: "",
                 checked: true,
+                example: "7-digit number (e.g., 1234567)",
+            },
+            {
+                id: `intake-operationcentercode`,
+                type: 'text',
+                propertyName: 'operationcentercode',
+                option: "",
+                checked: true,
+                example: "Text (e.g., TAMPA)",
+            },
+            {
+                id: `intake-planlevelcd`,
+                type: 'number',
+                propertyName: 'planlevelcd',
+                option: "",
+                checked: true,
+                example: "Number (e.g., 1)",
+            },
+            {
+                id: `intake-planid`,
+                type: 'number',
+                propertyName: 'planid',
+                option: "",
+                checked: true,
+                example: "Number (e.g., 16706)",
+            },
+            {
+                id: `intake-inspatid`,
+                type: 'text',
+                propertyName: 'inspatid',
+                option: "",
+                checked: true,
+                example: "Text (e.g., TESTTEST05)",
             },
         ];
 
@@ -453,27 +487,63 @@ const createIntakeDataWithRetry = async (
             const patientNumber = generatePatientNumber();
             
             // Handle both camelCase and UPPERCASE field names
-            const getFieldValue = (camelCase: string, uppercase: string) => {
-                return userData?.[uppercase] || userData?.[camelCase] || "";
+            const getFieldValue = (keys: string[]) => {
+                for (const key of keys) {
+                    if (userData?.[key]) {
+                        const val = String(userData[key]).trim();
+                        if (val) return val;
+                    }
+                }
+                return "";
             };
             
-            const firstName = getFieldValue('firstname', 'FIRSTNAME') && String(getFieldValue('firstname', 'FIRSTNAME')).trim() ? String(getFieldValue('firstname', 'FIRSTNAME')).trim() : generateRandomName('FIRST');
-            const lastName = getFieldValue('lastname', 'LASTNAME') && String(getFieldValue('lastname', 'LASTNAME')).trim() ? String(getFieldValue('lastname', 'LASTNAME')).trim() : generateRandomName('LAST');
-            const phone = getFieldValue('insphone', 'INSPHONE') && String(getFieldValue('insphone', 'INSPHONE')).trim() ? String(getFieldValue('insphone', 'INSPHONE')).trim() : generatePhoneNumber();
-            const dob = getFieldValue('dob', 'DOB') && String(getFieldValue('dob', 'DOB')).trim() ? String(getFieldValue('dob', 'DOB')).trim() : generateDob();
-            const zip = getFieldValue('zip', 'ZIP') && String(getFieldValue('zip', 'ZIP')).trim() ? String(getFieldValue('zip', 'ZIP')).trim() : generateZipCode();
-            const intakeId = getFieldValue('intakeid', 'INTAKEID') && String(getFieldValue('intakeid', 'INTAKEID')).trim() ? String(getFieldValue('intakeid', 'INTAKEID')).trim() : String(Math.floor(Math.random() * 9000000) + 1000000);
-            const subscriberId = getFieldValue('subscriberId', 'SUBSCRIBERID') && String(getFieldValue('subscriberId', 'SUBSCRIBERID')).trim() ? String(getFieldValue('subscriberId', 'SUBSCRIBERID')).trim() : generateSubscriberId();
+            // Validate numeric fields
+            const validateNumeric = (value: string, fieldName: string): boolean => {
+                if (!value) return true; // Allow empty for generation
+                if (!/^\d+$/.test(value)) {
+                    throw new Error(`${fieldName} must contain only numbers, got: "${value}"`);
+                }
+                return true;
+            };
+            
+            // Validate text fields
+            const validateText = (value: string, fieldName: string): boolean => {
+                if (!value) return true; // Allow empty for generation
+                if (value.length === 0) {
+                    throw new Error(`${fieldName} cannot be empty`);
+                }
+                return true;
+            };
+            
+            const firstName = getFieldValue(['FIRSTNAME', 'firstname']) || generateRandomName('FIRST');
+            const lastName = getFieldValue(['LASTNAME', 'lastname']) || generateRandomName('LAST');
+            const phone = getFieldValue(['INSPHONE', 'insphone']) || generatePhoneNumber();
+            const dob = getFieldValue(['DOB', 'dob']) || generateDob();
+            const zip = getFieldValue(['ZIP', 'zip']) || generateZipCode();
+            const intakeId = getFieldValue(['INTAKEID', 'intakeid']) || String(Math.floor(Math.random() * 9000000) + 1000000);
+            const subscriberId = getFieldValue(['SUBSCRIBERID', 'subscriberid']) || generateSubscriberId();
+            
+            // Get customizable fixed fields with validation
+            let operationCenterCode = getFieldValue(['OPERATIONCENTERCODE', 'operationcentercode']) || OPERATION_CENTER_CODE;
+            let planLevelCd = getFieldValue(['PLANLEVELCD', 'planlevelcd']) || PLAN_LEVEL_CD;
+            let planId = getFieldValue(['PLANID', 'planid']) || FIXED_PLAN_ID;
+            let insPatId = getFieldValue(['INSPATID', 'inspatid']) || FIXED_INS_PAT_ID;
+            
+            // Validate data types
+            validateText(operationCenterCode, 'OPERATIONCENTERCODE');
+            validateNumeric(planLevelCd, 'PLANLEVELCD');
+            validateNumeric(planId, 'PLANID');
+            validateText(insPatId, 'INSPATID');
 
             await connection.execute(
                 `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`,
-                [patientNumber, intakeId, OPERATION_CENTER_CODE],
+                [patientNumber, intakeId, operationCenterCode],
                 { autoCommit: true }
             );
 
             await connection.execute(
                 `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASTNAME, INSPHONE, INSDOB, PLANID, INSPATID, SUBSCRIBERID) VALUES (:1, :2, :3, :4, :5, :6, :7, TO_DATE(:8, 'DD-MON-YY'), :9, :10, :11)`,
-                [patientNumber, intakeId, OPERATION_CENTER_CODE, PLAN_LEVEL_CD, firstName, lastName, phone, dob, FIXED_PLAN_ID, FIXED_INS_PAT_ID, subscriberId],
+                [patientNumber, intakeId, operationCenterCode, planLevelCd, firstName, lastName, phone, dob, planId, insPatId, subscriberId],
                 { autoCommit: true }
             );
 

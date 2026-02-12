@@ -12,6 +12,7 @@ interface DataField {
   option: string;
   checked: boolean;
   value?: string;
+  example?: string;
 }
 
 interface DataRowProps {
@@ -36,7 +37,7 @@ const DataRow = ({ field, index, onUpdate, onDelete, onDuplicate, isCreateMode, 
           <Input
             value={field.value || ""}
             onChange={(e) => onUpdate(field.id, { value: e.target.value })}
-            placeholder="Leave empty for random data"
+            placeholder={field.example ? `e.g. ${field.example}` : "Leave empty for random data"}
             className="h-8"
           />
         </div>
