@@ -511,29 +511,48 @@ const createIntakeDataWithRetry = async (
             const planId = getFieldValue(['PLANID', 'planid']) || FIXED_PLAN_ID;
             const insPatId = getFieldValue(['INSPATID', 'inspatid']) || FIXED_INS_PAT_ID;
 
+            console.log('DEBUG CREATE INTAKE VALUES:', {
+                patientNumber,
+                intakeId,
+                operationCenterCode,
+                planLevelCd,
+                firstName,
+                lastName,
+                phone,
+                dob,
+                planId,
+                insPatId,
+                subscriberId,
+                zip
+            });
+
             await connection.execute(
                 `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`,
                 [patientNumber, intakeId, operationCenterCode],
                 { autoCommit: true }
             );
+            console.log('STEP 1: TBLPATINTAKE inserted');
 
             await connection.execute(
                 `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASTNAME, INSPHONE, INSDOB, PLANID, INSPATID, SUBSCRIBERID) VALUES (:1, :2, :3, :4, :5, :6, :7, TO_DATE(:8, 'DD-MON-YY'), :9, :10, :11)`,
                 [patientNumber, intakeId, operationCenterCode, planLevelCd, firstName, lastName, phone, dob, planId, insPatId, subscriberId],
                 { autoCommit: true }
             );
+            console.log('STEP 2: TBLPATINTAKEPLAN inserted');
 
             await connection.execute(
                 `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB, ZIP) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD-MON-YY'), :6)`,
                 [patientNumber, firstName, lastName, phone, dob, zip],
                 { autoCommit: true }
             );
+            console.log('STEP 3: TBLPATIENT inserted');
 
             const verifyResult = await connection.execute(
                 `SELECT * FROM TBLPATINTAKEPLAN WHERE PATIENTNUMBER = :1 AND INSFIRSTNAME = :2`,
                 [patientNumber, firstName],
                 { outFormat: oracledb.OUT_FORMAT_OBJECT }
             );
+            console.log('STEP 4: Verification query result:', verifyResult.rows);
 
             verificationData = verifyResult.rows?.map(row => serializeOracleRow(row)) || null;
             success = true;
@@ -560,6 +579,11 @@ app.post('/api/create-intake-data', async (req: Request, res: Response) => {
     }
 
     try {
+        console.log('=== CREATE INTAKE DATA REQUEST ===');
+        console.log('Environment:', environment);
+        console.log('Service Type:', serviceType);
+        console.log('Raw dataFields:', JSON.stringify(dataFields, null, 2));
+
         // Convert dataFields array to an object for easier lookup
         // dataFields format: [{ FIRSTNAME: 'value' }, { LASTNAME: 'value' }, ...]
         const userData: Record<string, any> = {};
@@ -568,10 +592,18 @@ app.post('/api/create-intake-data', async (req: Request, res: Response) => {
                 Object.assign(userData, field);
             });
         }
+        
+        console.log('Converted userData object:', userData);
 
         const result = await executeWithConnection(async (connection) => {
             return await createIntakeDataWithRetry(connection, MAX_RETRIES, userData);
         }, environment);
+
+        console.log('Create intake result:', {
+            success: result.success,
+            verificationDataCount: result.verificationData?.length || 0,
+            verificationData: result.verificationData
+        });
 
         if (result.success) {
             res.json({
@@ -583,6 +615,7 @@ app.post('/api/create-intake-data', async (req: Request, res: Response) => {
         }
 
     } catch (err) {
+        console.error('ERROR in create intake:', err);
         errorResponse(res, 500, 'Failed to process intake creation.', (err as Error).message);
     }
 });
