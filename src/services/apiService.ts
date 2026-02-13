@@ -22,9 +22,9 @@ const apiFetch = async (endpoint: string, options: FetchOptions = {}) => {
 };
 
 export const apiService = {
-  fetchSchema: (environment: string, serviceType: string) =>
+  fetchSchema: (environment: string, serviceType: string, mode?: string) =>
     apiFetch(
-      `${API_ENDPOINTS.SCHEMA}?environment=${environment}&serviceType=${serviceType}`
+      `${API_ENDPOINTS.SCHEMA}?environment=${environment}&serviceType=${serviceType}${mode ? `&mode=${mode}` : ''}`
     ),
 
   executeQuery: (environment: string, serviceType: string, selectedColumnNames: string[], filters?: Record<string, string>) =>

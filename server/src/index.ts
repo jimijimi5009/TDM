@@ -301,13 +301,115 @@ app.post('/api/external-call', async (req: Request, res: Response) => {
 });
 
 app.get('/api/service-schema', async (req: Request, res: Response) => {
-    const { environment, serviceType } = req.query;
+    const { environment, serviceType, mode } = req.query;
 
     if (!environment || !serviceType) {
         return errorResponse(res, 400, 'environment and serviceType query parameters are required.');
     }
 
     try {
+        // If mode is create-intake, return ONLY intake-specific fields
+        if (mode === 'create-intake') {
+            const intakeSpecificFields = [
+                {
+                    id: `intake-firstname`,
+                    type: 'text',
+                    propertyName: 'firstname',
+                    option: "",
+                    checked: true,
+                    example: "Text (e.g., John)",
+                },
+                {
+                    id: `intake-lastname`,
+                    type: 'text',
+                    propertyName: 'lastname',
+                    option: "",
+                    checked: true,
+                    example: "Text (e.g., Doe)",
+                },
+                {
+                    id: `intake-dob`,
+                    type: 'date',
+                    propertyName: 'dob',
+                    option: "",
+                    checked: true,
+                    example: "Date (e.g., 15-JAN-90)",
+                },
+                {
+                    id: `intake-insphone`,
+                    type: 'text',
+                    propertyName: 'insphone',
+                    option: "",
+                    checked: true,
+                    example: "Phone (e.g., 8135551234)",
+                },
+                {
+                    id: `intake-zip`,
+                    type: 'text',
+                    propertyName: 'zip',
+                    option: "",
+                    checked: true,
+                    example: "Zip (e.g., 33602)",
+                },
+                {
+                    id: `intake-subscriberid`,
+                    type: 'text',
+                    propertyName: 'subscriberid',
+                    option: "",
+                    checked: true,
+                    example: "Text (e.g., 123456789)",
+                },
+                {
+                    id: `intake-intakeid`,
+                    type: 'text',
+                    propertyName: 'intakeid',
+                    option: "",
+                    checked: true,
+                    example: "7-digit number (e.g., 1234567)",
+                },
+                {
+                    id: `intake-operationcentercode`,
+                    type: 'text',
+                    propertyName: 'operationcentercode',
+                    option: "",
+                    checked: true,
+                    example: "Text (e.g., TAMPA)",
+                },
+                {
+                    id: `intake-planlevelcd`,
+                    type: 'number',
+                    propertyName: 'planlevelcd',
+                    option: "",
+                    checked: true,
+                    example: "Number (e.g., 1)",
+                },
+                {
+                    id: `intake-planid`,
+                    type: 'number',
+                    propertyName: 'planid',
+                    option: "",
+                    checked: true,
+                    example: "Number (e.g., 16706)",
+                },
+                {
+                    id: `intake-inspatid`,
+                    type: 'text',
+                    propertyName: 'inspatid',
+                    option: "",
+                    checked: true,
+                    example: "Text (e.g., TESTTEST05)",
+                },
+            ];
+
+            res.json({
+                environment,
+                serviceType,
+                schema: intakeSpecificFields,
+            });
+            return;
+        }
+
+        // For query mode, return columns from database query
         const result = await executeWithConnection(async (connection) => {
             return await connection.execute(PATIENT_DATA_QUERY, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
         }, environment as string);
@@ -320,53 +422,6 @@ app.get('/api/service-schema', async (req: Request, res: Response) => {
             checked: true,
             example: "",
         })) || [];
-
-        // Add additional intake-specific fields that can be customized
-        const intakeSpecificFields = [
-            {
-                id: `intake-intakeid`,
-                type: 'text',
-                propertyName: 'intakeid',
-                option: "",
-                checked: true,
-                example: "7-digit number (e.g., 1234567)",
-            },
-            {
-                id: `intake-operationcentercode`,
-                type: 'text',
-                propertyName: 'operationcentercode',
-                option: "",
-                checked: true,
-                example: "Text (e.g., TAMPA)",
-            },
-            {
-                id: `intake-planlevelcd`,
-                type: 'number',
-                propertyName: 'planlevelcd',
-                option: "",
-                checked: true,
-                example: "Number (e.g., 1)",
-            },
-            {
-                id: `intake-planid`,
-                type: 'number',
-                propertyName: 'planid',
-                option: "",
-                checked: true,
-                example: "Number (e.g., 16706)",
-            },
-            {
-                id: `intake-inspatid`,
-                type: 'text',
-                propertyName: 'inspatid',
-                option: "",
-                checked: true,
-                example: "Text (e.g., TESTTEST05)",
-            },
-        ];
-
-        // Append intake-specific fields to schema
-        schemaFields = [...schemaFields, ...intakeSpecificFields];
 
         res.json({
             environment,
@@ -421,7 +476,7 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
 
         // Add filter conditions if provided
         const bindParams: any[] = [];
-        console.log('DEBUG: Active Filters:', JSON.stringify(activeFilters));
+
         
         if (activeFilters && Object.keys(activeFilters).length > 0) {
             let paramIndex = 1;
@@ -436,7 +491,7 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
                     // Use LIKE for more flexible matching (handles trailing spaces)
                     const condition = `UPPER(${tablePrefix}${colUpper}) LIKE UPPER(:${paramIndex})`;
                     
-                    console.log(`DEBUG: Applying Filter -> ${condition} [Value: %${trimmedVal}%]`);
+
                     filterConditions.push(condition);
                     bindParams.push(`%${trimmedVal}%`);
                     paramIndex++;
@@ -450,8 +505,7 @@ AND tpip.SUBSCRIBERID IS NOT NULL`;
 
         query += ` ORDER BY tp.DOB DESC FETCH FIRST 1 ROW ONLY`;
         
-        console.log('DEBUG: FINAL SQL QUERY:', query);
-        console.log('DEBUG: Bind Parameters:', bindParams);
+
 
         const debugInfo = { query, params: bindParams };
         lastExecutedQuery = debugInfo;
@@ -511,41 +565,28 @@ const createIntakeDataWithRetry = async (
             const planId = getFieldValue(['PLANID', 'planid']) || FIXED_PLAN_ID;
             const insPatId = getFieldValue(['INSPATID', 'inspatid']) || FIXED_INS_PAT_ID;
 
-            console.log('DEBUG CREATE INTAKE VALUES:', {
-                patientNumber,
-                intakeId,
-                operationCenterCode,
-                planLevelCd,
-                firstName,
-                lastName,
-                phone,
-                dob,
-                planId,
-                insPatId,
-                subscriberId,
-                zip
-            });
+            // Intake values prepared for insertion
 
             await connection.execute(
                 `INSERT INTO TBLPATINTAKE (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE) VALUES (:1, :2, :3)`,
                 [patientNumber, intakeId, operationCenterCode],
                 { autoCommit: true }
             );
-            console.log('STEP 1: TBLPATINTAKE inserted');
+
 
             await connection.execute(
                 `INSERT INTO TBLPATINTAKEPLAN (PATIENTNUMBER, INTAKEID, OPERATIONCENTERCODE, PLANLEVELCD, INSFIRSTNAME, INSLASTNAME, INSPHONE, INSDOB, PLANID, INSPATID, SUBSCRIBERID) VALUES (:1, :2, :3, :4, :5, :6, :7, TO_DATE(:8, 'DD-MON-YY'), :9, :10, :11)`,
                 [patientNumber, intakeId, operationCenterCode, planLevelCd, firstName, lastName, phone, dob, planId, insPatId, subscriberId],
                 { autoCommit: true }
             );
-            console.log('STEP 2: TBLPATINTAKEPLAN inserted');
+
 
             await connection.execute(
                 `INSERT INTO TBLPATIENT (PATIENTNUMBER, FIRSTNAME, LASTNAME, PHONE, DOB, ZIP) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD-MON-YY'), :6)`,
                 [patientNumber, firstName, lastName, phone, dob, zip],
                 { autoCommit: true }
             );
-            console.log('STEP 3: TBLPATIENT inserted');
+
 
             // Verify data was inserted - check all three tables
             const verifyPatient = await connection.execute(
@@ -553,25 +594,25 @@ const createIntakeDataWithRetry = async (
                 [patientNumber],
                 { outFormat: oracledb.OUT_FORMAT_OBJECT }
             );
-            console.log('STEP 4A: TBLPATIENT verification:', verifyPatient.rows);
+
             
             const verifyIntake = await connection.execute(
                 `SELECT * FROM TBLPATINTAKE WHERE PATIENTNUMBER = :1`,
                 [patientNumber],
                 { outFormat: oracledb.OUT_FORMAT_OBJECT }
             );
-            console.log('STEP 4B: TBLPATINTAKE verification:', verifyIntake.rows);
+
             
             const verifyIntakePlan = await connection.execute(
                 `SELECT * FROM TBLPATINTAKEPLAN WHERE PATIENTNUMBER = :1`,
                 [patientNumber],
                 { outFormat: oracledb.OUT_FORMAT_OBJECT }
             );
-            console.log('STEP 4C: TBLPATINTAKEPLAN verification:', verifyIntakePlan.rows);
+
             
             // Return the intake plan data as it's the most complete
             const verifyResult = verifyIntakePlan;
-            console.log('FINAL: Returning verification data from TBLPATINTAKEPLAN');
+
 
             verificationData = verifyResult.rows?.map(row => serializeOracleRow(row)) || null;
             success = true;
@@ -579,7 +620,7 @@ const createIntakeDataWithRetry = async (
 
         } catch (err: unknown) {
             if ((err as oracledb.DBError).errorNum === 1) {
-                console.log(`Attempt ${attempt}/${maxRetries} failed due to constraint violation.`);
+
                 if (attempt === maxRetries) throw err;
             } else {
                 throw err;
@@ -598,10 +639,7 @@ app.post('/api/create-intake-data', async (req: Request, res: Response) => {
     }
 
     try {
-        console.log('=== CREATE INTAKE DATA REQUEST ===');
-        console.log('Environment:', environment);
-        console.log('Service Type:', serviceType);
-        console.log('Raw dataFields:', JSON.stringify(dataFields, null, 2));
+
 
         // Convert dataFields array to an object for easier lookup
         // dataFields format: [{ FIRSTNAME: 'value' }, { LASTNAME: 'value' }, ...]
@@ -611,18 +649,10 @@ app.post('/api/create-intake-data', async (req: Request, res: Response) => {
                 Object.assign(userData, field);
             });
         }
-        
-        console.log('Converted userData object:', userData);
 
         const result = await executeWithConnection(async (connection) => {
             return await createIntakeDataWithRetry(connection, MAX_RETRIES, userData);
         }, environment);
-
-        console.log('Create intake result:', {
-            success: result.success,
-            verificationDataCount: result.verificationData?.length || 0,
-            verificationData: result.verificationData
-        });
 
         if (result.success) {
             res.json({

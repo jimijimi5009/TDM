@@ -35,16 +35,18 @@ const snakeToCamel = (str: string) => {
 const ServiceCall = () => {
     const { toast } = useToast();
     const [fields, setFields] = useState<DataField[]>([]);
+    const [intakeFields, setIntakeFields] = useState<DataField[]>([]);
     const [queryOutput, setQueryOutput] = useState<Record<string, any>[] | string | null>(null);
+    const [intakeOutput, setIntakeOutput] = useState<Record<string, any>[] | string | null>(null);
     const [newFieldType, setNewFieldType] = useState("names");
     const [environment, setEnvironment] = useState<string>("Q1");
     const [selectedService, setSelectedService] = useState("");
     const [dataType, setDataType] = useState("static");
     const [isLoading, setIsLoading] = useState(false);
-    const [operationMode, setOperationMode] = useState<"query" | "create" | "create-intake">("query");
+    const [isIntakeLoading, setIsIntakeLoading] = useState(false);
     const [isCreateConfirmOpen, setCreateConfirmOpen] = useState(false);
 
-    const handleFetchSchema = useCallback(async (mode: "query" | "create" | "create-intake" = "query") => {
+    const handleFetchQuerySchema = useCallback(async () => {
         if (!selectedService) {
             toast({
                 title: "Service Type Required",
@@ -57,16 +59,15 @@ const ServiceCall = () => {
         setIsLoading(true);
         setFields([]);
         setQueryOutput(null);
-        setOperationMode(mode);
 
         try {
-            const result = await apiService.fetchSchema(environment, selectedService);
+            const result = await apiService.fetchSchema(environment, selectedService, "query");
             
             if (result.schema?.length > 0) {
                 setFields(result.schema.map((field: DataField) => ({ ...field, value: field.value || "" })));
                 toast({
                     title: "Schema Loaded",
-                    description: `Schema for ${selectedService} from ${environment} loaded for ${mode} operation.`,
+                    description: `Query schema for ${selectedService} from ${environment} loaded.`,
                 });
             } else {
                 toast({
@@ -86,6 +87,47 @@ const ServiceCall = () => {
         }
     }, [environment, selectedService, toast]);
 
+    const handleFetchIntakeSchema = useCallback(async () => {
+        if (!selectedService) {
+            toast({
+                title: "Service Type Required",
+                description: "Please select a Service Type to fetch its schema.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setIsIntakeLoading(true);
+        setIntakeFields([]);
+        setIntakeOutput(null);
+
+        try {
+            const result = await apiService.fetchSchema(environment, selectedService, "create-intake");
+            
+            if (result.schema?.length > 0) {
+                setIntakeFields(result.schema.map((field: DataField) => ({ ...field, value: field.value || "" })));
+                toast({
+                    title: "Schema Loaded",
+                    description: `Intake schema for ${selectedService} from ${environment} loaded.`,
+                });
+            } else {
+                toast({
+                    title: "No Schema Found",
+                    description: `No schema fields returned for ${selectedService} in ${environment}.`,
+                    variant: "destructive",
+                });
+            }
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: `Failed to load service schema: ${error instanceof Error ? error.message : String(error)}`,
+                variant: "destructive",
+            });
+        } finally {
+            setIsIntakeLoading(false);
+        }
+    }, [environment, selectedService, toast]);
+
     const updateField = useCallback((id: string, updates: Partial<DataField>) => {
       setFields(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
     }, []);
@@ -96,6 +138,24 @@ const ServiceCall = () => {
 
     const duplicateField = useCallback((id: string) => {
       setFields(prev => {
+        const field = prev.find(f => f.id === id);
+        if (!field) return prev;
+        const newField = { ...field, id: Date.now().toString() };
+        const index = prev.findIndex(f => f.id === id);
+        return [...prev.slice(0, index + 1), newField, ...prev.slice(index + 1)];
+      });
+    }, []);
+
+    const updateIntakeField = useCallback((id: string, updates: Partial<DataField>) => {
+      setIntakeFields(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
+    }, []);
+
+    const deleteIntakeField = useCallback((id: string) => {
+      setIntakeFields(prev => prev.filter(f => f.id !== id));
+    }, []);
+
+    const duplicateIntakeField = useCallback((id: string) => {
+      setIntakeFields(prev => {
         const field = prev.find(f => f.id === id);
         if (!field) return prev;
         const newField = { ...field, id: Date.now().toString() };
@@ -118,6 +178,10 @@ const ServiceCall = () => {
 
     const toggleAll = useCallback((checked: boolean) => {
       setFields(prev => prev.map(f => ({ ...f, checked })));
+    }, []);
+
+    const toggleAllIntake = useCallback((checked: boolean) => {
+      setIntakeFields(prev => prev.map(f => ({ ...f, checked })));
     }, []);
 
 
@@ -151,14 +215,10 @@ const ServiceCall = () => {
             }
         });
 
-        console.log('DEBUG: Built filters object:', filters);
-        console.log('DEBUG: All fields:', fields);
-
         setIsLoading(true);
         setQueryOutput(null);
 
         try {
-            console.log('DEBUG: Calling executeQuery with filters:', filters);
             const result = await apiService.executeQuery(environment, selectedService, selectedColumns, filters);
 
             if (result.data) {
@@ -201,19 +261,17 @@ const ServiceCall = () => {
             return;
         }
 
-        setIsLoading(true);
-        setQueryOutput(null);
+        setIsIntakeLoading(true);
+        setIntakeOutput(null);
 
         try {
             // Build dataFields object from fields - include empty values as fallback for random generation
             const dataFields: Record<string, any>[] = [];
-            fields.filter(f => f.checked).forEach(field => {
+            intakeFields.filter(f => f.checked).forEach(field => {
                 dataFields.push({
                     [field.propertyName]: field.value || "",
                 });
             });
-
-            console.log('DEBUG: Intake dataFields:', dataFields);
 
             const result = await apiService.createIntakeData(
                 environment,
@@ -223,24 +281,24 @@ const ServiceCall = () => {
 
             if (result.data) {
                 const dataToSet = Array.isArray(result.data) ? result.data : [result.data];
-                setQueryOutput(dataToSet);
+                setIntakeOutput(dataToSet);
                 toast({ title: "Data Creation Successful", description: result.message || `Intake data created and verified in ${environment}.` });
             } else if (result.message) {
-                setQueryOutput(result.message);
+                setIntakeOutput(result.message);
                 toast({ title: "Data Creation Info", description: result.message || "Process finished.", variant: "destructive" });
             } else {
-                setQueryOutput("An unknown issue occurred during data creation.");
+                setIntakeOutput("An unknown issue occurred during data creation.");
                 toast({ title: "Data Creation Info", description: "Process finished.", variant: "destructive" });
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            setQueryOutput(JSON.stringify({ error: errorMessage }, null, 2));
+            setIntakeOutput(JSON.stringify({ error: errorMessage }, null, 2));
             toast({ title: "Error", description: `Failed to create intake data: ${errorMessage}`, variant: "destructive" });
         } finally {
-            setIsLoading(false);
+            setIsIntakeLoading(false);
             setCreateConfirmOpen(false);
         }
-    }, [environment, selectedService, fields, toast]);
+    }, [environment, selectedService, intakeFields, toast]);
 
     const renderOutput = () => {
         if (!queryOutput) return null;
@@ -322,6 +380,95 @@ const ServiceCall = () => {
                 })() : (
                     <Textarea
                         value={isErrorOrInfoString ? queryOutput : JSON.stringify(queryOutput, null, 2)}
+                        readOnly
+                        rows={10}
+                        className="bg-background text-foreground font-mono resize-y"
+                    />
+                )}
+            </div>
+        );
+    };
+
+    const renderIntakeOutput = () => {
+        if (!intakeOutput) return null;
+
+        const isErrorOrInfoString = typeof intakeOutput === 'string';
+        const isDataArray = Array.isArray(intakeOutput) && intakeOutput.length > 0;
+
+        const safeToString = (value: any): string => {
+            if (value === null || value === undefined) {
+                return '';
+            }
+            const str = String(value);
+            if (str === '[object Object]') {
+                try {
+                    return JSON.stringify(value);
+                } catch {
+                    return str;
+                }
+            }
+            return str;
+        };
+
+        return (
+            <div className="mt-6 p-4 border rounded-lg bg-card-foreground">
+                <h3 className="text-xl font-semibold mb-4 text-white">Intake Output</h3>
+                {isDataArray ? (() => {
+                    const allRows = intakeOutput;
+                    const allPossibleKeys = Array.from(new Set(
+                        allRows.flatMap(row => Object.keys(row))
+                    ));
+                    
+                    const columnsToShow = allPossibleKeys.filter(key => {
+                        return allRows.some(row => {
+                            const value = row[key];
+                            if (value === null || value === undefined) return false;
+                            const strValue = safeToString(value).trim();
+                            if (!strValue || strValue === '' || strValue.toLowerCase() === 'null') return false;
+                            return true;
+                        });
+                    });
+
+                    if (columnsToShow.length === 0) {
+                        return <p className="text-muted-foreground">Query returned a result, but all columns are empty.</p>;
+                    }
+
+                    return (
+                        <div className="overflow-x-auto rounded-lg shadow-2xl border border-gray-200">
+                            <Table className="w-full">
+                                <TableHeader>
+                                    <TableRow className="bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 transition-all">
+                                        {columnsToShow.map(key => (
+                                            <TableHead key={key} className="text-white font-semibold py-4 px-4 text-left">
+                                                {key}
+                                            </TableHead>
+                                        ))}
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {intakeOutput.map((row, rowIndex) => (
+                                        <TableRow 
+                                            key={rowIndex}
+                                            className={`${
+                                                rowIndex % 2 === 0 
+                                                    ? 'bg-gray-50 hover:bg-green-50' 
+                                                    : 'bg-white hover:bg-green-50'
+                                            } transition-colors border-b border-gray-200 last:border-b-0`}
+                                        >
+                                            {columnsToShow.map(key => (
+                                                <TableCell key={`${rowIndex}-${key}`} className="py-3 px-4 text-gray-900 font-medium">
+                                                    {safeToString(row[key])}
+                                                </TableCell>
+                                            ))}
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    );
+                })() : (
+                    <Textarea
+                        value={isErrorOrInfoString ? intakeOutput : JSON.stringify(intakeOutput, null, 2)}
                         readOnly
                         rows={10}
                         className="bg-background text-foreground font-mono resize-y"
@@ -422,7 +569,8 @@ const ServiceCall = () => {
                     </h1>
 
                     <div className="space-y-6">
-                        <StepCard step={1} title="Choose the types of data you want">
+                        {/* Environment and Service Type Selection */}
+                        <StepCard step={1} title="Select Environment and Service">
                             <div className="flex items-center gap-4 mb-4">
                                 <span className="text-sm font-medium text-muted-foreground">Select Environment</span>
                                 <Select value={environment} onValueChange={setEnvironment}>
@@ -450,46 +598,34 @@ const ServiceCall = () => {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                <Button onClick={() => handleFetchSchema("query")} variant="outline" size="sm" disabled={!selectedService}>
+                            </div>
+                        </StepCard>
+
+                        {/* QUERY SECTION */}
+                        <StepCard step={2} title="Execute Query">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Button onClick={handleFetchQuerySchema} variant="outline" size="sm" disabled={!selectedService || isLoading}>
                                     Fetch Schema <Database className="h-4 w-4 ml-1" />
                                 </Button>
                             </div>
 
                             <div className="flex items-center gap-4 px-4 py-3 rounded-t-lg bg-table-header text-table-header-text text-sm font-medium mb-2">
-                                {operationMode === "create-intake" ? (
-                                    <>
-                                        <span className="flex-1">Column Name</span>
-                                        <span className="flex-1">Value (Optional - Random if Empty)</span>
-                                        <span className="w-20">Actions</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="w-4" />
-                                        <Checkbox
-                                            checked={allChecked}
-                                            onCheckedChange={toggleAll}
-                                            className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                        />
-                                        <span className="w-8">All</span>
-                                        <span className="w-[180px]">Data Type</span>
-                                        <span className="w-[140px]">Property Name</span>
-                                        <span className="w-[160px]">Actual Data</span>
-                                        <span className="ml-auto">Actions</span>
-                                    </>
-                                )}
+                                <div className="w-4" />
+                                <Checkbox
+                                    checked={fields.every(f => f.checked)}
+                                    onCheckedChange={toggleAll}
+                                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                />
+                                <span className="w-8">All</span>
+                                <span className="w-[180px]">Data Type</span>
+                                <span className="w-[140px]">Property Name</span>
+                                <span className="w-[160px]">Actual Data</span>
+                                <span className="ml-auto">Actions</span>
                             </div>
                             
-                            {operationMode !== "create-intake" && (
-                                <div className="text-xs text-muted-foreground px-4 mb-2">
-                                    Select columns to use in your query. Use filters to narrow results.
-                                </div>
-                            )}
-                            
-                            {operationMode === "create-intake" && (
-                                <div className="text-xs text-muted-foreground px-4 mb-2">
-                                    Enter values for the fields you want to customize. Empty fields will use random data.
-                                </div>
-                            )}
+                            <div className="text-xs text-muted-foreground px-4 mb-2">
+                                Select columns to use in your query. Use filters to narrow results.
+                            </div>
                             
                             <div className="space-y-0 mb-4">
                                 {fields.map((field, index) => (
@@ -500,40 +636,12 @@ const ServiceCall = () => {
                                         onUpdate={updateField}
                                         onDelete={deleteField}
                                         onDuplicate={duplicateField}
-                                        isCreateMode={operationMode === "create" || operationMode === "create-intake"}
-                                        isIntakeMode={operationMode === "create-intake"}
+                                        isCreateMode={false}
+                                        isIntakeMode={false}
                                     />
                                 ))}
                             </div>
-                            
-                            {operationMode === "create" && (
-                                <div className="flex items-center gap-4 pt-4 border-t border-border">
-                                    <span className="text-sm font-medium text-muted-foreground">Add More</span>
-                                    <Select value={newFieldType} onValueChange={setNewFieldType}>
-                                        <SelectTrigger className="w-[180px] bg-card">
-                                            <SelectValue placeholder="Select Data Type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {DATA_TYPES.map((type) => (
-                                                <SelectItem key={type.value} value={type.value}>
-                                                    <span className="flex items-center gap-2">
-                                                        <span>{type.icon}</span>
-                                                        <span>{type.label}</span>
-                                                    </span>
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <Button onClick={addField} variant="outline" size="sm">
-                                        Add <Plus className="h-4 w-4 ml-1" />
-                                    </Button>
-                                </div>
-                            )}
-                        </StepCard>
 
-
-
-                        {operationMode === "query" && (
                             <Button
                                 onClick={handleExecute}
                                 disabled={isLoading || !selectedService || fields.filter(f => f.checked).length === 0}
@@ -541,39 +649,55 @@ const ServiceCall = () => {
                             >
                                 {isLoading ? "Executing..." : "Execute"}
                             </Button>
-                        )}
 
-                        {operationMode === "create" && (
-                            <Button
-                                onClick={handleCreate}
-                                disabled={isLoading || !selectedService || fields.filter(f => f.checked).length === 0}
-                                className="w-full bg-green-500 hover:bg-green-600 text-primary-foreground py-2 rounded mt-2"
-                            >
-                                {isLoading ? "Creating..." : "Create Data"}
-                            </Button>
-                        )}
+                            {renderOutput()}
+                        </StepCard>
 
-                        <div className="flex gap-2 mt-4">
-                            <Button
-                                onClick={() => handleFetchSchema("create-intake")}
-                                variant="outline"
-                                size="sm"
-                                disabled={!selectedService || isLoading}
-                                className="flex-1"
-                            >
-                                Fetch Schema for Intake <Database className="h-4 w-4 ml-1" />
-                            </Button>
-                            <Button
-                                onClick={() => setCreateConfirmOpen(true)}
-                                disabled={isLoading || !selectedService}
-                                className="flex-1 bg-green-500 hover:bg-green-600 text-primary-foreground py-2 rounded"
-                            >
-                                {isLoading ? "Processing..." : "Create Intake Data"} <Plus className="h-4 w-4 ml-2"/>
-                            </Button>
-                        </div>
+                        {/* CREATE INTAKE SECTION */}
+                        <StepCard step={3} title="Create Intake Data">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Button onClick={handleFetchIntakeSchema} variant="outline" size="sm" disabled={!selectedService || isIntakeLoading}>
+                                    Fetch Schema <Database className="h-4 w-4 ml-1" />
+                                </Button>
+                            </div>
 
-                        {renderOutput()}
-                    </div>
+                            <div className="flex items-center gap-4 px-4 py-3 rounded-t-lg bg-table-header text-table-header-text text-sm font-medium mb-2">
+                                <span className="flex-1">Column Name</span>
+                                <span className="flex-1">Value (Optional - Random if Empty)</span>
+                                <span className="w-20">Actions</span>
+                            </div>
+                            
+                            <div className="text-xs text-muted-foreground px-4 mb-2">
+                                Enter values for the fields you want to customize. Empty fields will use random data.
+                            </div>
+                            
+                            <div className="space-y-0 mb-4">
+                                {intakeFields.map((field, index) => (
+                                    <DataRow
+                                        key={field.id}
+                                        field={field}
+                                        index={index}
+                                        onUpdate={updateIntakeField}
+                                        onDelete={deleteIntakeField}
+                                        onDuplicate={duplicateIntakeField}
+                                        isCreateMode={true}
+                                        isIntakeMode={true}
+                                    />
+                                ))}
+                            </div>
+
+                            <div className="flex gap-2 mt-4">
+                                <Button
+                                    onClick={() => setCreateConfirmOpen(true)}
+                                    disabled={isIntakeLoading || !selectedService}
+                                    className="w-full bg-green-500 hover:bg-green-600 text-primary-foreground py-2 rounded"
+                                >
+                                    {isIntakeLoading ? "Processing..." : "Create Intake Data"} <Plus className="h-4 w-4 ml-2"/>
+                                </Button>
+                            </div>
+
+                            {intakeOutput && renderIntakeOutput()}
+                        </StepCard>
                 </main>
             </div>
             {/* New AlertDialog for "Create Intake Data" confirmation */}
