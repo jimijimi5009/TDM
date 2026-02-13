@@ -698,6 +698,7 @@ const ServiceCall = () => {
 
                             {intakeOutput && renderIntakeOutput()}
                         </StepCard>
+                    </div>
                 </main>
             </div>
             {/* New AlertDialog for "Create Intake Data" confirmation */}
