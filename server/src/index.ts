@@ -547,12 +547,31 @@ const createIntakeDataWithRetry = async (
             );
             console.log('STEP 3: TBLPATIENT inserted');
 
-            const verifyResult = await connection.execute(
-                `SELECT * FROM TBLPATINTAKEPLAN WHERE PATIENTNUMBER = :1 AND INSFIRSTNAME = :2`,
-                [patientNumber, firstName],
+            // Verify data was inserted - check all three tables
+            const verifyPatient = await connection.execute(
+                `SELECT * FROM TBLPATIENT WHERE PATIENTNUMBER = :1`,
+                [patientNumber],
                 { outFormat: oracledb.OUT_FORMAT_OBJECT }
             );
-            console.log('STEP 4: Verification query result:', verifyResult.rows);
+            console.log('STEP 4A: TBLPATIENT verification:', verifyPatient.rows);
+            
+            const verifyIntake = await connection.execute(
+                `SELECT * FROM TBLPATINTAKE WHERE PATIENTNUMBER = :1`,
+                [patientNumber],
+                { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            );
+            console.log('STEP 4B: TBLPATINTAKE verification:', verifyIntake.rows);
+            
+            const verifyIntakePlan = await connection.execute(
+                `SELECT * FROM TBLPATINTAKEPLAN WHERE PATIENTNUMBER = :1`,
+                [patientNumber],
+                { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            );
+            console.log('STEP 4C: TBLPATINTAKEPLAN verification:', verifyIntakePlan.rows);
+            
+            // Return the intake plan data as it's the most complete
+            const verifyResult = verifyIntakePlan;
+            console.log('FINAL: Returning verification data from TBLPATINTAKEPLAN');
 
             verificationData = verifyResult.rows?.map(row => serializeOracleRow(row)) || null;
             success = true;
