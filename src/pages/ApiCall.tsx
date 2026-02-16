@@ -2,15 +2,17 @@ import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import Header from "@/components/Header";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const ApiCall = () => {
   const [requestType, setRequestType] = useState("initial");
   const [dataType, setDataType] = useState("static");
   const [selectedEnvironment, setSelectedEnvironment] = useState("Q1");
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
   }, [requestType]);
@@ -415,9 +417,29 @@ const ApiCall = () => {
   };
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      
       <main className="container py-8 max-w-6xl">
+        {/* Navigation Tabs */}
+        <div className="flex gap-2 mb-8 bg-white rounded-lg p-1 shadow-sm w-fit">
+          <button 
+            onClick={() => navigate("/")} 
+            className={`px-6 py-2 rounded-lg font-medium transition-all ${location.pathname === "/" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+          >
+            Test Data
+          </button>
+          <button 
+            onClick={() => navigate("/api-call")} 
+            className={`px-6 py-2 rounded-lg font-medium transition-all ${location.pathname === "/api-call" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+          >
+            API Call
+          </button>
+          <button 
+            onClick={() => navigate("/service-call")} 
+            className={`px-6 py-2 rounded-lg font-medium transition-all ${location.pathname === "/service-call" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+          >
+            Service Call
+          </button>
+        </div>
+
         <h1 className="text-3xl font-bold text-center mb-8 text-foreground">
           API Call Generator
         </h1>

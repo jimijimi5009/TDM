@@ -25,6 +25,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ENVIRONMENTS, SERVICE_TYPES } from "@/constants";
 import { apiService } from "@/services/apiService";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const DEFAULT_FIELDS: DataField[] = [];
 
@@ -34,6 +35,9 @@ const snakeToCamel = (str: string) => {
 
 const ServiceCall = () => {
     const { toast } = useToast();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const isServiceCallPage = location.pathname === "/service-call";
     const [fields, setFields] = useState<DataField[]>([]);
     const [intakeFields, setIntakeFields] = useState<DataField[]>([]);
     const [queryOutput, setQueryOutput] = useState<Record<string, any>[] | string | null>(null);
@@ -560,144 +564,225 @@ const ServiceCall = () => {
 
     return (
         <>
-            <div className="min-h-screen bg-background">
-                <Header />
+            <div className="min-h-screen bg-slate-50">
+                <main className="max-w-6xl mx-auto px-6 py-8">
+                    {/* Navigation Tabs */}
+                    <div className="flex gap-2 mb-8 bg-white rounded-lg p-1 shadow-sm">
+                        <button 
+                            onClick={() => navigate("/")} 
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${location.pathname === "/" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+                        >
+                            Test Data
+                        </button>
+                        <button 
+                            onClick={() => navigate("/api-call")} 
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${location.pathname === "/api-call" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+                        >
+                            API Call
+                        </button>
+                        <button 
+                            onClick={() => navigate("/service-call")} 
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${location.pathname === "/service-call" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+                        >
+                            Service Call
+                        </button>
+                    </div>
 
-                <main className="container py-8 max_w_6xl">
-                    <h1 className="text-3xl font-bold text-center mb-8 text-foreground">
-                        Service Call Generator
-                    </h1>
+                    {/* Header Section */}
+                    <div className="bg-white rounded-xl p-8 shadow-sm border-l-4 border-blue-600 mb-8">
+                        <div className="flex items-center gap-4 mb-3">
+                            <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white text-xl font-bold">
+                                ⚙️
+                            </div>
+                            <h1 className="text-3xl font-bold text-slate-900">
+                                Service Call Generator
+                            </h1>
+                        </div>
+                        <p className="text-slate-600 text-sm">Generate and manage test data for Patient Rest Services</p>
+                    </div>
 
                     <div className="space-y-6">
                         {/* Environment and Service Type Selection */}
-                        <StepCard step={1} title="Select Environment and Service">
-                            <div className="flex items-center gap-4 mb-4">
-                                <span className="text-sm font-medium text-muted-foreground">Select Environment</span>
-                                <Select value={environment} onValueChange={setEnvironment}>
-                                    <SelectTrigger className="w-[180px] bg-card">
-                                        <SelectValue placeholder="Select Environment" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {ENVIRONMENTS.map((env) => (
-                                            <SelectItem key={env} value={env}>
-                                                {env}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <span className="text-sm font-medium text-muted-foreground">Select Service Type</span>
-                                <Select value={selectedService} onValueChange={setSelectedService}>
-                                    <SelectTrigger className="w-[280px] bg-card">
-                                        <SelectValue placeholder="Select Service Type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {SERVICE_TYPES.map((service) => (
-                                            <SelectItem key={service.value} value={service.value}>
-                                                {service.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                        <div className="bg-white rounded-xl p-8 shadow-md border border-slate-200">
+                            <h2 className="text-xl font-bold text-slate-900 mb-6">Select Environment and Service</h2>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Select Environment</label>
+                                    <Select value={environment} onValueChange={setEnvironment}>
+                                        <SelectTrigger className="w-full bg-white border-2 border-slate-200">
+                                            <SelectValue placeholder="Select Environment" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {ENVIRONMENTS.map((env) => (
+                                                <SelectItem key={env} value={env}>
+                                                    {env}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Select Service Type</label>
+                                    <Select value={selectedService} onValueChange={setSelectedService}>
+                                        <SelectTrigger className="w-full bg-white border-2 border-slate-200">
+                                            <SelectValue placeholder="Select Service Type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {SERVICE_TYPES.map((service) => (
+                                                <SelectItem key={service.value} value={service.value}>
+                                                    {service.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
-                        </StepCard>
+                        </div>
 
                         {/* QUERY SECTION */}
-                        <StepCard step={2} title="Execute Query">
-                            <div className="flex items-center gap-2 mb-4">
-                                <Button onClick={handleFetchQuerySchema} variant="outline" size="sm" disabled={!selectedService || isLoading}>
-                                    Fetch Schema <Database className="h-4 w-4 ml-1" />
+                        <div className="bg-white rounded-xl p-8 shadow-md border border-slate-200">
+                            <h2 className="text-xl font-bold text-slate-900 mb-6">Retrieve Record</h2>
+                            
+                            <div className="mb-6">
+                                <Button 
+                                    onClick={handleFetchQuerySchema} 
+                                    disabled={!selectedService || isLoading}
+                                    variant="default"
+                                    className="bg-slate-700 hover:bg-slate-800 text-white"
+                                >
+                                    📋 Fetch Schema
                                 </Button>
                             </div>
 
-                            <div className="flex items-center gap-4 px-4 py-3 rounded-t-lg bg-table-header text-table-header-text text-sm font-medium mb-2">
-                                <div className="w-4" />
-                                <Checkbox
-                                    checked={fields.every(f => f.checked)}
-                                    onCheckedChange={toggleAll}
-                                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                />
-                                <span className="w-8">All</span>
-                                <span className="w-[180px]">Data Type</span>
-                                <span className="w-[140px]">Property Name</span>
-                                <span className="w-[160px]">Actual Data</span>
-                                <span className="ml-auto">Actions</span>
-                            </div>
-                            
-                            <div className="text-xs text-muted-foreground px-4 mb-2">
+                            <div className="flex items-center gap-2 p-3 bg-slate-100 rounded-lg mb-4 text-sm text-slate-600">
+                                <span>ℹ️</span>
                                 Select columns to use in your query. Use filters to narrow results.
                             </div>
-                            
-                            <div className="space-y-0 mb-4">
-                                {fields.map((field, index) => (
-                                    <DataRow
-                                        key={field.id}
-                                        field={field}
-                                        index={index}
-                                        onUpdate={updateField}
-                                        onDelete={deleteField}
-                                        onDuplicate={duplicateField}
-                                        isCreateMode={false}
-                                        isIntakeMode={false}
-                                    />
-                                ))}
+
+                            <div className="overflow-x-auto rounded-lg border border-slate-200 mb-4">
+                                <table className="w-full">
+                                    <thead className="bg-white border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 w-12">
+                                                <Checkbox
+                                                    checked={fields.every(f => f.checked)}
+                                                    onCheckedChange={toggleAll}
+                                                    className="data-[state=checked]:bg-blue-600"
+                                                />
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Name</th>
+                                            <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Type</th>
+                                            <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200">
+                                        {fields.length > 0 ? (
+                                            fields.map((field, index) => (
+                                                <tr key={field.id} className="hover:bg-slate-50">
+                                                    <td className="px-4 py-3">
+                                                        <Checkbox
+                                                            checked={field.checked}
+                                                            onCheckedChange={(checked) => updateField(field.id, { checked: checked === true })}
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm text-slate-700">{field.propertyName}</td>
+                                                    <td className="px-4 py-3 text-sm text-slate-700">{field.type}</td>
+                                                    <td className="px-4 py-3 text-sm">
+                                                        <div className="flex gap-2">
+                                                            <button className="text-blue-600 hover:text-blue-800" onClick={() => duplicateField(field.id)}>📋</button>
+                                                            <button className="text-red-600 hover:text-red-800" onClick={() => deleteField(field.id)}>🗑️</button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
+                                                    <div className="text-3xl mb-2">📊</div>
+                                                    Click "Fetch Schema" to load available fields
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
 
                             <Button
                                 onClick={handleExecute}
                                 disabled={isLoading || !selectedService || fields.filter(f => f.checked).length === 0}
-                                className="w-full bg-blue-500 hover:bg-blue-600 text-primary-foreground py-2 rounded mt-2"
+                                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium mt-4"
                             >
-                                {isLoading ? "Executing..." : "Execute"}
+                                🔍 {isLoading ? "Searching..." : "Search Records"}
                             </Button>
 
                             {renderOutput()}
-                        </StepCard>
+                        </div>
 
                         {/* CREATE INTAKE SECTION */}
-                        <StepCard step={3} title="Create Intake Data">
-                            <div className="flex items-center gap-2 mb-4">
-                                <Button onClick={handleFetchIntakeSchema} variant="outline" size="sm" disabled={!selectedService || isIntakeLoading}>
-                                    Fetch Schema <Database className="h-4 w-4 ml-1" />
+                        <div className="bg-white rounded-xl p-8 shadow-md border border-slate-200">
+                            <h2 className="text-xl font-bold text-slate-900 mb-6">Create Data</h2>
+                            
+                            <div className="mb-6">
+                                <Button 
+                                    onClick={handleFetchIntakeSchema} 
+                                    disabled={!selectedService || isIntakeLoading}
+                                    variant="default"
+                                    className="bg-slate-700 hover:bg-slate-800 text-white"
+                                >
+                                    📋 Fetch Schema
                                 </Button>
                             </div>
 
-                            <div className="flex items-center gap-4 px-4 py-3 rounded-t-lg bg-table-header text-table-header-text text-sm font-medium mb-2">
-                                <span className="flex-1">Column Name</span>
-                                <span className="flex-1">Value (Optional - Random if Empty)</span>
-                                <span className="w-20">Actions</span>
-                            </div>
-                            
-                            <div className="text-xs text-muted-foreground px-4 mb-2">
+                            <div className="flex items-center gap-2 p-3 bg-slate-100 rounded-lg mb-4 text-sm text-slate-600">
+                                <span>ℹ️</span>
                                 Enter values for the fields you want to customize. Empty fields will use random data.
                             </div>
-                            
-                            <div className="space-y-0 mb-4">
-                                {intakeFields.map((field, index) => (
-                                    <DataRow
-                                        key={field.id}
-                                        field={field}
-                                        index={index}
-                                        onUpdate={updateIntakeField}
-                                        onDelete={deleteIntakeField}
-                                        onDuplicate={duplicateIntakeField}
-                                        isCreateMode={true}
-                                        isIntakeMode={true}
-                                    />
-                                ))}
+
+                            <div className="overflow-x-auto rounded-lg border border-slate-200 mb-4">
+                                <table className="w-full">
+                                    <thead className="bg-white border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Column Name</th>
+                                            <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Value</th>
+                                            <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200">
+                                        {intakeFields.length > 0 ? (
+                                            intakeFields.map((field, index) => (
+                                                <tr key={field.id} className="hover:bg-slate-50">
+                                                    <td className="px-4 py-3 text-sm text-slate-700">{field.propertyName}</td>
+                                                    <td className="px-4 py-3 text-sm"><Input value={field.value} onChange={(e) => updateIntakeField(field.id, { value: e.target.value })} placeholder="Optional" className="w-full max-w-xs" /></td>
+                                                    <td className="px-4 py-3 text-sm">
+                                                        <div className="flex gap-2">
+                                                            <button className="text-blue-600 hover:text-blue-800" onClick={() => duplicateIntakeField(field.id)}>📋</button>
+                                                            <button className="text-red-600 hover:text-red-800" onClick={() => deleteIntakeField(field.id)}>🗑️</button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={3} className="px-4 py-8 text-center text-slate-500">
+                                                    <div className="text-3xl mb-2">✏️</div>
+                                                    Click "Fetch Schema" to load available fields
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
 
-                            <div className="flex gap-2 mt-4">
-                                <Button
-                                    onClick={() => setCreateConfirmOpen(true)}
-                                    disabled={isIntakeLoading || !selectedService}
-                                    className="w-full bg-green-500 hover:bg-green-600 text-primary-foreground py-2 rounded"
-                                >
-                                    {isIntakeLoading ? "Processing..." : "Create Intake Data"} <Plus className="h-4 w-4 ml-2"/>
-                                </Button>
-                            </div>
+                            <Button
+                                onClick={() => setCreateConfirmOpen(true)}
+                                disabled={isIntakeLoading || !selectedService}
+                                className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-medium mt-4"
+                            >
+                                ✨ {isIntakeLoading ? "Creating..." : "Create Data"}
+                            </Button>
 
                             {intakeOutput && renderIntakeOutput()}
-                        </StepCard>
+                        </div>
                     </div>
                 </main>
             </div>

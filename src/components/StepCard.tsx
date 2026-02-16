@@ -11,7 +11,7 @@ const StepCard = ({ step, title, children }: StepCardProps) => {
   return (
     <Card className="shadow-card border-border/50 overflow-hidden">
       <CardHeader className="flex flex-row items-center gap-4 pb-4">
-        <div className="step-badge">{step}</div>
+        {step > 0 && <div className="step-badge">{step}</div>}
         <h2 className="text-lg font-semibold text-foreground">{title}</h2>
       </CardHeader>
       <CardContent>{children}</CardContent>
