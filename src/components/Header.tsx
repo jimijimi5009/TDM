@@ -35,6 +35,13 @@ const Header = () => {
           >
             Service Call
           </NavLink>
+          <NavLink
+            to="/create-intake-data"
+            className="text-muted-foreground transition-colors hover:text-foreground"
+            activeClassName="text-foreground font-semibold"
+          >
+            Create Intake Data
+          </NavLink>
         </nav>
 
         <div />
