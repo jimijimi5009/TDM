@@ -531,14 +531,14 @@ const ServiceCall = () => {
                                     <h2 className="text-lg font-semibold text-foreground">Retrieve Data</h2>
                                 </CardHeader>
                                 <CardContent>
+                                    <div className="text-sm text-muted-foreground mb-4">
+                                        Click on select columns to select the columns you would like to view.
+                                    </div>
+
                                     <div className="flex items-center gap-2 mb-4">
                                         <Button onClick={handleFetchQuerySchema} variant="outline" size="sm" disabled={!selectedService || isQueryLoading}>
                                             Select columns <Database className="h-4 w-4 ml-1" />
                                         </Button>
-                                    </div>
-
-                                    <div className="text-sm text-muted-foreground mb-4">
-                                        Click on select columns to select the columns you would like to view.
                                     </div>
 
                                     <div className="flex items-center gap-4 px-4 py-3 rounded-t-lg bg-table-header text-table-header-text text-sm font-medium mb-2">
@@ -632,13 +632,17 @@ const ServiceCall = () => {
                                         ))}
                                     </div>
 
+                                    <div className="text-sm text-muted-foreground mb-4">
+                                        Click on create data to create new data in the Data Base.
+                                    </div>
+
                                     <div className="flex gap-2 mt-4">
                                         <Button
                                             onClick={() => setCreateConfirmOpen(true)}
                                             disabled={isCreateLoading || !selectedService}
                                             className="w-full bg-green-500 hover:bg-green-600 text-primary-foreground py-2 rounded"
                                         >
-                                            {isCreateLoading ? "Processing..." : "Create Data"}
+                                            {isCreateLoading ? "Processing..." : "Create"}
                                         </Button>
                                     </div>
 
