@@ -533,8 +533,12 @@ const ServiceCall = () => {
                                 <CardContent>
                                     <div className="flex items-center gap-2 mb-4">
                                         <Button onClick={handleFetchQuerySchema} variant="outline" size="sm" disabled={!selectedService || isQueryLoading}>
-                                            Fetch Schema <Database className="h-4 w-4 ml-1" />
+                                            Select columns <Database className="h-4 w-4 ml-1" />
                                         </Button>
+                                    </div>
+
+                                    <div className="text-sm text-muted-foreground mb-4">
+                                        Click on select columns to select the columns you would like to view.
                                     </div>
 
                                     <div className="flex items-center gap-4 px-4 py-3 rounded-t-lg bg-table-header text-table-header-text text-sm font-medium mb-2">
@@ -570,6 +574,10 @@ const ServiceCall = () => {
                                         ))}
                                     </div>
 
+                                    <div className="text-sm text-muted-foreground mb-4">
+                                        Click on search to view the data on the console
+                                    </div>
+
                                     <Button
                                         onClick={handleExecute}
                                         disabled={isQueryLoading || !selectedService || fields.filter(f => f.checked).length === 0}
@@ -590,9 +598,12 @@ const ServiceCall = () => {
                                     <h2 className="text-lg font-semibold text-foreground">Create Data</h2>
                                 </CardHeader>
                                 <CardContent>
+                                    <div className="text-sm text-muted-foreground mb-4">
+                                        Click on Customize Data to create customize data
+                                    </div>
                                     <div className="flex items-center gap-2 mb-4">
                                         <Button onClick={handleFetchIntakeSchema} variant="outline" size="sm" disabled={!selectedService || isCreateLoading}>
-                                            Fetch Schema <Database className="h-4 w-4 ml-1" />
+                                            Customize Data <Database className="h-4 w-4 ml-1" />
                                         </Button>
                                     </div>
 

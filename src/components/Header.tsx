@@ -10,7 +10,7 @@ const Header = () => {
             <Database className="h-8 w-8 text-primary" />
             <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-card bg-primary" />
           </div>
-          <span className="text-xl font-semibold text-foreground">TestDataMangement</span>
+          <span className="text-xl font-semibold text-foreground">TestDataManagement</span>
         </div>
         
         <nav className="flex items-center gap-6">

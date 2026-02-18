@@ -239,7 +239,7 @@ const Index = () => {
       
       <footer className="border-t border-border py-6 mt-12">
         <div className="container text-center text-sm text-muted-foreground">
-          <p>TestDataMangement - Generate realistic test data for your projects</p>
+          <p>TestDataManagement - Generate realistic test data for your projects</p>
         </div>
       </footer>
     </div>
