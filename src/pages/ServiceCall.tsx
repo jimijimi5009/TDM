@@ -18,7 +18,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ENVIRONMENTS, SERVICE_TYPES } from "@/constants";
+import { ENVIRONMENTS, SERVICE_TYPES, API_ENDPOINTS } from "@/constants";
 import { apiService } from "@/services/apiService";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -131,11 +131,15 @@ const ServiceCall = () => {
       });
 
       return {
-        environment,
-        service: selectedService,
-        selectedColumns,
-        filters,
-        queryType: "query"
+        endpoint: API_ENDPOINTS.EXECUTE,
+        method: "POST",
+        url: `${window.location.origin}${API_ENDPOINTS.EXECUTE}`,
+        payload: {
+          environment,
+          serviceType: selectedService,
+          selectedColumnNames: selectedColumns,
+          filters: filters || {}
+        }
       };
     }, [environment, selectedService, fields]);
 
@@ -148,10 +152,14 @@ const ServiceCall = () => {
       });
 
       return {
-        environment,
-        service: selectedService,
-        dataFields: dataFields.length > 0 ? dataFields : undefined,
-        queryType: "create-intake"
+        endpoint: API_ENDPOINTS.CREATE_INTAKE,
+        method: "POST",
+        url: `${window.location.origin}${API_ENDPOINTS.CREATE_INTAKE}`,
+        payload: {
+          environment,
+          serviceType: selectedService,
+          ...(dataFields.length > 0 && { dataFields })
+        }
       };
     }, [environment, selectedService, intakeFields]);
 
@@ -903,30 +911,54 @@ const ServiceCall = () => {
             
             {/* Dialog for Query Payload */}
             <Dialog open={showPayloadDialog} onOpenChange={setShowPayloadDialog}>
-                <DialogContent className="max-w-2xl max-h-96 overflow-y-auto">
+                <DialogContent className="max-w-3xl max-h-96 overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>API Query Payload</DialogTitle>
+                        <DialogTitle>API Query Endpoint & Payload</DialogTitle>
                         <DialogDescription>
-                            This is the payload that will be sent to the API when you click Search.
+                            Full endpoint information that will be used when you click Search.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
-                        <pre>{JSON.stringify(buildQueryPayload(), null, 2)}</pre>
+                    <div className="space-y-3">
+                        <div className="bg-gray-900 text-gray-100 p-4 rounded-lg">
+                            <div className="font-mono text-sm">
+                                <div><span className="text-green-400">Endpoint:</span> <span className="text-yellow-400">{buildQueryPayload().endpoint}</span></div>
+                                <div><span className="text-green-400">Method:</span> <span className="text-yellow-400">{buildQueryPayload().method}</span></div>
+                                <div><span className="text-green-400">Full URL:</span> <span className="text-yellow-400 break-all">{buildQueryPayload().url}</span></div>
+                            </div>
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium mb-2">Request Payload:</p>
+                            <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+                                <pre>{JSON.stringify(buildQueryPayload().payload, null, 2)}</pre>
+                            </div>
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>
 
             {/* Dialog for Create Payload */}
             <Dialog open={showCreatePayloadDialog} onOpenChange={setShowCreatePayloadDialog}>
-                <DialogContent className="max-w-2xl max-h-96 overflow-y-auto">
+                <DialogContent className="max-w-3xl max-h-96 overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>API Create Payload</DialogTitle>
+                        <DialogTitle>API Create Endpoint & Payload</DialogTitle>
                         <DialogDescription>
-                            This is the payload that will be sent to the API when you click Create.
+                            Full endpoint information that will be used when you click Create.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
-                        <pre>{JSON.stringify(buildCreatePayload(), null, 2)}</pre>
+                    <div className="space-y-3">
+                        <div className="bg-gray-900 text-gray-100 p-4 rounded-lg">
+                            <div className="font-mono text-sm">
+                                <div><span className="text-green-400">Endpoint:</span> <span className="text-yellow-400">{buildCreatePayload().endpoint}</span></div>
+                                <div><span className="text-green-400">Method:</span> <span className="text-yellow-400">{buildCreatePayload().method}</span></div>
+                                <div><span className="text-green-400">Full URL:</span> <span className="text-yellow-400 break-all">{buildCreatePayload().url}</span></div>
+                            </div>
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium mb-2">Request Payload:</p>
+                            <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+                                <pre>{JSON.stringify(buildCreatePayload().payload, null, 2)}</pre>
+                            </div>
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>
