@@ -1,6 +1,6 @@
 import Header from "@/components/Header";
 import { useState, useCallback } from "react";
-import { Plus, Database } from "lucide-react";
+import { Plus, Database, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,6 +21,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ENVIRONMENTS, SERVICE_TYPES } from "@/constants";
 import { apiService } from "@/services/apiService";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import FormatSelector from "@/components/FormatSelector";
 
 const DEFAULT_FIELDS: DataField[] = [];
 
@@ -38,12 +46,16 @@ const ServiceCall = () => {
     const [fields, setFields] = useState<DataField[]>([]);
     const [queryOutput, setQueryOutput] = useState<Record<string, any>[] | string | null>(null);
     const [isQueryLoading, setIsQueryLoading] = useState(false);
+    const [showPayloadDialog, setShowPayloadDialog] = useState(false);
+    const [queryFormat, setQueryFormat] = useState<string>("table");
     
     // Create Data state
     const [intakeFields, setIntakeFields] = useState<DataField[]>([]);
     const [intakeOutput, setIntakeOutput] = useState<Record<string, any>[] | string | null>(null);
     const [isCreateLoading, setIsCreateLoading] = useState(false);
     const [isCreateConfirmOpen, setCreateConfirmOpen] = useState(false);
+    const [showCreatePayloadDialog, setShowCreatePayloadDialog] = useState(false);
+    const [createFormat, setCreateFormat] = useState<string>("table");
 
     // ============ RETRIEVE DATA HANDLERS ============
     const handleFetchQuerySchema = useCallback(async () => {
@@ -108,6 +120,113 @@ const ServiceCall = () => {
     const toggleAll = useCallback((checked: boolean) => {
       setFields(prev => prev.map(f => ({ ...f, checked })));
     }, []);
+
+    const buildQueryPayload = useCallback(() => {
+      const selectedColumns = fields.filter(f => f.checked).map(f => f.propertyName);
+      const filters: Record<string, string> = {};
+      fields.forEach(field => {
+        if (field.value && String(field.value).trim() !== "") {
+          filters[field.propertyName] = field.value;
+        }
+      });
+
+      return {
+        environment,
+        service: selectedService,
+        selectedColumns,
+        filters,
+        queryType: "query"
+      };
+    }, [environment, selectedService, fields]);
+
+    const buildCreatePayload = useCallback(() => {
+      const dataFields: Record<string, any>[] = [];
+      intakeFields.filter(f => f.checked).forEach(field => {
+        dataFields.push({
+          [field.propertyName]: field.value || "",
+        });
+      });
+
+      return {
+        environment,
+        service: selectedService,
+        dataFields: dataFields.length > 0 ? dataFields : undefined,
+        queryType: "create-intake"
+      };
+    }, [environment, selectedService, intakeFields]);
+
+    const formatDataAsJson = (data: any): string => {
+      return JSON.stringify(data, null, 2);
+    };
+
+    const formatDataAsCsv = (data: Record<string, any>[]): string => {
+      if (!Array.isArray(data) || data.length === 0) {
+        return JSON.stringify(data, null, 2);
+      }
+      const headers = Array.from(new Set(data.flatMap(row => Object.keys(row))));
+      const csvRows = data.map(row => 
+        headers.map(h => {
+          const val = row[h];
+          const strVal = val === null || val === undefined ? '' : String(val);
+          return `"${strVal.replace(/"/g, '""')}"`;
+        }).join(',')
+      );
+      return [headers.join(','), ...csvRows].join('\n');
+    };
+
+    const formatDataAsPlainText = (data: Record<string, any>[]): string => {
+      if (!Array.isArray(data) || data.length === 0) {
+        return JSON.stringify(data, null, 2);
+      }
+      const headers = Array.from(new Set(data.flatMap(row => Object.keys(row))));
+      let text = headers.join('\t') + '\n';
+      text += data.map(row => 
+        headers.map(h => {
+          const val = row[h];
+          return val === null || val === undefined ? '' : String(val);
+        }).join('\t')
+      ).join('\n');
+      return text;
+    };
+
+    const downloadData = (content: string, filename: string, type: string) => {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    };
+
+    const handleDownloadData = (data: any, format: string, dataType: string) => {
+      let content = '';
+      let filename = '';
+      let mimeType = 'text/plain';
+
+      if (format === 'json') {
+        content = formatDataAsJson(data);
+        filename = `${dataType}_${Date.now()}.json`;
+        mimeType = 'application/json';
+      } else if (format === 'csv') {
+        content = formatDataAsCsv(Array.isArray(data) ? data : [data]);
+        filename = `${dataType}_${Date.now()}.csv`;
+        mimeType = 'text/csv';
+      } else if (format === 'plaintext') {
+        content = formatDataAsPlainText(Array.isArray(data) ? data : [data]);
+        filename = `${dataType}_${Date.now()}.txt`;
+        mimeType = 'text/plain';
+      } else if (format === 'pdf') {
+        // Simple PDF export (you can use libraries like jsPDF for more advanced features)
+        content = formatDataAsPlainText(Array.isArray(data) ? data : [data]);
+        filename = `${dataType}_${Date.now()}.pdf`;
+        mimeType = 'application/pdf';
+      }
+
+      if (content) {
+        downloadData(content, filename, mimeType);
+      }
+    };
 
     const handleExecute = useCallback(async () => {
         if (!selectedService) {
@@ -303,9 +422,59 @@ const ServiceCall = () => {
             return str;
         };
 
+        // Render based on selected format
+        if (queryFormat === 'json' || queryFormat === 'csv' || queryFormat === 'plaintext' || queryFormat === 'pdf') {
+            let displayText = '';
+            if (queryFormat === 'json') {
+                displayText = formatDataAsJson(queryOutput);
+            } else if (queryFormat === 'csv' && isDataArray) {
+                displayText = formatDataAsCsv(queryOutput as Record<string, any>[]);
+            } else if ((queryFormat === 'plaintext' || queryFormat === 'pdf') && isDataArray) {
+                displayText = formatDataAsPlainText(queryOutput as Record<string, any>[]);
+            } else {
+                // For string outputs or when format doesn't work, show as plain text
+                displayText = typeof queryOutput === 'string' ? queryOutput : JSON.stringify(queryOutput, null, 2);
+            }
+
+            return (
+                <div className="mt-6 p-4 border rounded-lg bg-card-foreground">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl font-semibold text-white">Output</h3>
+                        <Button
+                            onClick={() => handleDownloadData(queryOutput, queryFormat, 'query_data')}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-2"
+                        >
+                            <Download className="h-4 w-4" />
+                            Download
+                        </Button>
+                    </div>
+                    <Textarea
+                        value={displayText}
+                        readOnly
+                        rows={15}
+                        className="bg-background text-foreground font-mono text-sm resize-y"
+                    />
+                </div>
+            );
+        }
+
+        // Default table format
         return (
             <div className="mt-6 p-4 border rounded-lg bg-card-foreground">
-                <h3 className="text-xl font-semibold mb-4 text-white">Output</h3>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-semibold text-white">Output</h3>
+                    <Button
+                        onClick={() => handleDownloadData(queryOutput, 'json', 'query_data')}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                    >
+                        <Download className="h-4 w-4" />
+                        Download
+                    </Button>
+                </div>
                 {isDataArray ? (() => {
                     const allRows = queryOutput;
                     const allPossibleKeys = Array.from(new Set(allRows.flatMap(row => Object.keys(row))));
@@ -387,9 +556,59 @@ const ServiceCall = () => {
             return str;
         };
 
+        // Render based on selected format
+        if (createFormat === 'json' || createFormat === 'csv' || createFormat === 'plaintext' || createFormat === 'pdf') {
+            let displayText = '';
+            if (createFormat === 'json') {
+                displayText = formatDataAsJson(intakeOutput);
+            } else if (createFormat === 'csv' && isDataArray) {
+                displayText = formatDataAsCsv(intakeOutput as Record<string, any>[]);
+            } else if ((createFormat === 'plaintext' || createFormat === 'pdf') && isDataArray) {
+                displayText = formatDataAsPlainText(intakeOutput as Record<string, any>[]);
+            } else {
+                // For string outputs or when format doesn't work, show as plain text
+                displayText = typeof intakeOutput === 'string' ? intakeOutput : JSON.stringify(intakeOutput, null, 2);
+            }
+
+            return (
+                <div className="mt-6 p-4 border rounded-lg bg-card-foreground">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl font-semibold text-white">Output</h3>
+                        <Button
+                            onClick={() => handleDownloadData(intakeOutput, createFormat, 'create_data')}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-2"
+                        >
+                            <Download className="h-4 w-4" />
+                            Download
+                        </Button>
+                    </div>
+                    <Textarea
+                        value={displayText}
+                        readOnly
+                        rows={15}
+                        className="bg-background text-foreground font-mono text-sm resize-y"
+                    />
+                </div>
+            );
+        }
+
+        // Default table format
         return (
             <div className="mt-6 p-4 border rounded-lg bg-card-foreground">
-                <h3 className="text-xl font-semibold mb-4 text-white">Output</h3>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-semibold text-white">Output</h3>
+                    <Button
+                        onClick={() => handleDownloadData(intakeOutput, 'json', 'create_data')}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                    >
+                        <Download className="h-4 w-4" />
+                        Download
+                    </Button>
+                </div>
                 {isDataArray ? (() => {
                     const allRows = intakeOutput;
                     const allPossibleKeys = Array.from(new Set(allRows.flatMap(row => Object.keys(row))));
@@ -578,13 +797,28 @@ const ServiceCall = () => {
                                         Click on search to view the data on the console
                                     </div>
 
-                                    <Button
-                                        onClick={handleExecute}
-                                        disabled={isQueryLoading || !selectedService || fields.filter(f => f.checked).length === 0}
-                                        className="w-full bg-blue-500 hover:bg-blue-600 text-primary-foreground py-2 rounded mt-2"
-                                    >
-                                        {isQueryLoading ? "Searching..." : "Search"}
-                                    </Button>
+                                    <div className="mb-4 p-4 border rounded-lg bg-card">
+                                        <p className="text-sm font-medium text-foreground mb-2">Choose Data Format</p>
+                                        <FormatSelector value={queryFormat} onChange={setQueryFormat} />
+                                    </div>
+
+                                    <div className="flex gap-2 mb-4">
+                                        <Button
+                                            onClick={() => setShowPayloadDialog(true)}
+                                            variant="outline"
+                                            disabled={!selectedService || fields.filter(f => f.checked).length === 0}
+                                            className="flex-1"
+                                        >
+                                            View Payload
+                                        </Button>
+                                        <Button
+                                            onClick={handleExecute}
+                                            disabled={isQueryLoading || !selectedService || fields.filter(f => f.checked).length === 0}
+                                            className="flex-1 bg-blue-500 hover:bg-blue-600 text-primary-foreground py-2 rounded"
+                                        >
+                                            {isQueryLoading ? "Searching..." : "Search"}
+                                        </Button>
+                                    </div>
 
                                     {renderOutput()}
                                 </CardContent>
@@ -636,11 +870,24 @@ const ServiceCall = () => {
                                         Click on create data to create new data in the Data Base.
                                     </div>
 
+                                    <div className="mb-4 p-4 border rounded-lg bg-card">
+                                        <p className="text-sm font-medium text-foreground mb-2">Choose Data Format</p>
+                                        <FormatSelector value={createFormat} onChange={setCreateFormat} />
+                                    </div>
+
                                     <div className="flex gap-2 mt-4">
+                                        <Button
+                                            onClick={() => setShowCreatePayloadDialog(true)}
+                                            variant="outline"
+                                            disabled={!selectedService || intakeFields.filter(f => f.checked).length === 0}
+                                            className="flex-1"
+                                        >
+                                            View Payload
+                                        </Button>
                                         <Button
                                             onClick={() => setCreateConfirmOpen(true)}
                                             disabled={isCreateLoading || !selectedService}
-                                            className="w-full bg-green-500 hover:bg-green-600 text-primary-foreground py-2 rounded"
+                                            className="flex-1 bg-green-500 hover:bg-green-600 text-primary-foreground py-2 rounded"
                                         >
                                             {isCreateLoading ? "Processing..." : "Create"}
                                         </Button>
@@ -654,6 +901,36 @@ const ServiceCall = () => {
                 </main>
             </div>
             
+            {/* Dialog for Query Payload */}
+            <Dialog open={showPayloadDialog} onOpenChange={setShowPayloadDialog}>
+                <DialogContent className="max-w-2xl max-h-96 overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>API Query Payload</DialogTitle>
+                        <DialogDescription>
+                            This is the payload that will be sent to the API when you click Search.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+                        <pre>{JSON.stringify(buildQueryPayload(), null, 2)}</pre>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Dialog for Create Payload */}
+            <Dialog open={showCreatePayloadDialog} onOpenChange={setShowCreatePayloadDialog}>
+                <DialogContent className="max-w-2xl max-h-96 overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>API Create Payload</DialogTitle>
+                        <DialogDescription>
+                            This is the payload that will be sent to the API when you click Create.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+                        <pre>{JSON.stringify(buildCreatePayload(), null, 2)}</pre>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             {/* AlertDialog for "Create Data" confirmation */}
             <AlertDialog open={isCreateConfirmOpen} onOpenChange={setCreateConfirmOpen}>
                 <AlertDialogContent>

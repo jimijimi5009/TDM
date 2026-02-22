@@ -2,9 +2,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 
 const FORMATS = [
+  { value: "table", label: "Table" },
   { value: "json", label: "JSON" },
   { value: "csv", label: "CSV" },
-  { value: "sql", label: "SQL" },
+  { value: "plaintext", label: "Plain Text" },
+  { value: "pdf", label: "PDF" },
 ];
 
 interface FormatSelectorProps {
