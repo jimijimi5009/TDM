@@ -6,7 +6,6 @@ const FORMATS = [
   { value: "json", label: "JSON" },
   { value: "csv", label: "CSV" },
   { value: "plaintext", label: "Plain Text" },
-  { value: "pdf", label: "PDF" },
 ];
 
 interface FormatSelectorProps {

@@ -1,6 +1,6 @@
 import Header from "@/components/Header";
 import { useState, useCallback } from "react";
-import { Plus, Database, Download } from "lucide-react";
+import { Plus, Database, Download, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -207,6 +207,21 @@ const ServiceCall = () => {
       URL.revokeObjectURL(url);
     };
 
+    const copyToClipboard = (text: string) => {
+      navigator.clipboard.writeText(text).then(() => {
+        toast({
+          title: "Copied",
+          description: "Payload copied to clipboard",
+        });
+      }).catch(() => {
+        toast({
+          title: "Error",
+          description: "Failed to copy to clipboard",
+          variant: "destructive",
+        });
+      });
+    };
+
     const handleDownloadData = (data: any, format: string, dataType: string) => {
       let content = '';
       let filename = '';
@@ -224,11 +239,6 @@ const ServiceCall = () => {
         content = formatDataAsPlainText(Array.isArray(data) ? data : [data]);
         filename = `${dataType}_${Date.now()}.txt`;
         mimeType = 'text/plain';
-      } else if (format === 'pdf') {
-        // Simple PDF export (you can use libraries like jsPDF for more advanced features)
-        content = formatDataAsPlainText(Array.isArray(data) ? data : [data]);
-        filename = `${dataType}_${Date.now()}.pdf`;
-        mimeType = 'application/pdf';
       }
 
       if (content) {
@@ -431,13 +441,13 @@ const ServiceCall = () => {
         };
 
         // Render based on selected format
-        if (queryFormat === 'json' || queryFormat === 'csv' || queryFormat === 'plaintext' || queryFormat === 'pdf') {
+        if (queryFormat === 'json' || queryFormat === 'csv' || queryFormat === 'plaintext') {
             let displayText = '';
             if (queryFormat === 'json') {
                 displayText = formatDataAsJson(queryOutput);
             } else if (queryFormat === 'csv' && isDataArray) {
                 displayText = formatDataAsCsv(queryOutput as Record<string, any>[]);
-            } else if ((queryFormat === 'plaintext' || queryFormat === 'pdf') && isDataArray) {
+            } else if (queryFormat === 'plaintext' && isDataArray) {
                 displayText = formatDataAsPlainText(queryOutput as Record<string, any>[]);
             } else {
                 // For string outputs or when format doesn't work, show as plain text
@@ -565,13 +575,13 @@ const ServiceCall = () => {
         };
 
         // Render based on selected format
-        if (createFormat === 'json' || createFormat === 'csv' || createFormat === 'plaintext' || createFormat === 'pdf') {
+        if (createFormat === 'json' || createFormat === 'csv' || createFormat === 'plaintext') {
             let displayText = '';
             if (createFormat === 'json') {
                 displayText = formatDataAsJson(intakeOutput);
             } else if (createFormat === 'csv' && isDataArray) {
                 displayText = formatDataAsCsv(intakeOutput as Record<string, any>[]);
-            } else if ((createFormat === 'plaintext' || createFormat === 'pdf') && isDataArray) {
+            } else if (createFormat === 'plaintext' && isDataArray) {
                 displayText = formatDataAsPlainText(intakeOutput as Record<string, any>[]);
             } else {
                 // For string outputs or when format doesn't work, show as plain text
@@ -927,7 +937,18 @@ const ServiceCall = () => {
                             </div>
                         </div>
                         <div>
-                            <p className="text-sm font-medium mb-2">Request Payload:</p>
+                            <div className="flex justify-between items-center mb-2">
+                                <p className="text-sm font-medium">Request Payload:</p>
+                                <Button
+                                    onClick={() => copyToClipboard(JSON.stringify(buildQueryPayload().payload, null, 2))}
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex items-center gap-2 h-8"
+                                >
+                                    <Copy className="h-4 w-4" />
+                                    Copy
+                                </Button>
+                            </div>
                             <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
                                 <pre>{JSON.stringify(buildQueryPayload().payload, null, 2)}</pre>
                             </div>
@@ -954,7 +975,18 @@ const ServiceCall = () => {
                             </div>
                         </div>
                         <div>
-                            <p className="text-sm font-medium mb-2">Request Payload:</p>
+                            <div className="flex justify-between items-center mb-2">
+                                <p className="text-sm font-medium">Request Payload:</p>
+                                <Button
+                                    onClick={() => copyToClipboard(JSON.stringify(buildCreatePayload().payload, null, 2))}
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex items-center gap-2 h-8"
+                                >
+                                    <Copy className="h-4 w-4" />
+                                    Copy
+                                </Button>
+                            </div>
                             <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
                                 <pre>{JSON.stringify(buildCreatePayload().payload, null, 2)}</pre>
                             </div>
