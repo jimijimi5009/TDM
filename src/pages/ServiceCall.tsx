@@ -908,7 +908,7 @@ const ServiceCall = () => {
                                     </div>
 
                                     <div className="mb-4 p-4 border rounded-lg bg-card">
-                                        <p className="text-sm font-medium text-foreground mb-3">Number of Rows to Create</p>
+                                        <p className="text-sm font-medium text-foreground mb-3">Number of Data to create</p>
                                         <div className="flex items-center gap-4">
                                             <Input
                                                 type="number"
@@ -919,7 +919,7 @@ const ServiceCall = () => {
                                                 max={1000}
                                             />
                                             <span className="text-sm text-muted-foreground">
-                                                (Create between 1 and 1000 rows)
+                                                (Create between 1 and 1000 data)
                                             </span>
                                         </div>
                                     </div>
