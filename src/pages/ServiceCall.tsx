@@ -3,6 +3,7 @@ import { useState, useCallback } from "react";
 import { Plus, Database, Download, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DataRow, { DataField } from "@/components/DataRow";
 import { useToast } from "../hooks/use-toast";
@@ -56,6 +57,7 @@ const ServiceCall = () => {
     const [isCreateConfirmOpen, setCreateConfirmOpen] = useState(false);
     const [showCreatePayloadDialog, setShowCreatePayloadDialog] = useState(false);
     const [createFormat, setCreateFormat] = useState<string>("table");
+    const [createRowCount, setCreateRowCount] = useState<number>(1);
 
     // ============ RETRIEVE DATA HANDLERS ============
     const handleFetchQuerySchema = useCallback(async () => {
@@ -385,27 +387,39 @@ const ServiceCall = () => {
         setIntakeOutput(null);
 
         try {
-            // Build dataFields object from fields - include empty values as fallback for random generation
-            const dataFields: Record<string, any>[] = [];
-            intakeFields.filter(f => f.checked).forEach(field => {
-                dataFields.push({
-                    [field.propertyName]: field.value || "",
+            // Generate multiple rows
+            const allDataFields: Record<string, any>[][] = [];
+            
+            for (let row = 0; row < createRowCount; row++) {
+                // Build dataFields object from fields - include empty values as fallback for random generation
+                const dataFields: Record<string, any>[] = [];
+                intakeFields.filter(f => f.checked).forEach(field => {
+                    dataFields.push({
+                        [field.propertyName]: field.value || "",
+                    });
                 });
-            });
+                allDataFields.push(dataFields);
+            }
 
-            const result = await apiService.createIntakeData(
-                environment,
-                selectedService,
-                dataFields.length > 0 ? dataFields : undefined
-            );
+            // Create all rows (call API for each row or in batch)
+            const allResults: any[] = [];
+            
+            for (const dataFields of allDataFields) {
+                const result = await apiService.createIntakeData(
+                    environment,
+                    selectedService,
+                    dataFields.length > 0 ? dataFields : undefined
+                );
+                
+                if (result.data) {
+                    const data = Array.isArray(result.data) ? result.data : [result.data];
+                    allResults.push(...data);
+                }
+            }
 
-            if (result.data) {
-                const dataToSet = Array.isArray(result.data) ? result.data : [result.data];
-                setIntakeOutput(dataToSet);
-                toast({ title: "Data Creation Successful", description: result.message || `Data created and verified in ${environment}.` });
-            } else if (result.message) {
-                setIntakeOutput(result.message);
-                toast({ title: "Data Creation Info", description: result.message || "Process finished.", variant: "destructive" });
+            if (allResults.length > 0) {
+                setIntakeOutput(allResults);
+                toast({ title: "Data Creation Successful", description: `${allResults.length} rows created and verified in ${environment}.` });
             } else {
                 setIntakeOutput("An unknown issue occurred during data creation.");
                 toast({ title: "Data Creation Info", description: "Process finished.", variant: "destructive" });
@@ -418,7 +432,7 @@ const ServiceCall = () => {
             setIsCreateLoading(false);
             setCreateConfirmOpen(false);
         }
-    }, [environment, selectedService, intakeFields, toast]);
+    }, [environment, selectedService, intakeFields, createRowCount, toast]);
 
     // ============ RENDER FUNCTIONS ============
     const renderOutput = () => {
@@ -891,6 +905,23 @@ const ServiceCall = () => {
                                     <div className="mb-4 p-4 border rounded-lg bg-card">
                                         <p className="text-sm font-medium text-foreground mb-2">Choose Data Format</p>
                                         <FormatSelector value={createFormat} onChange={setCreateFormat} />
+                                    </div>
+
+                                    <div className="mb-4 p-4 border rounded-lg bg-card">
+                                        <p className="text-sm font-medium text-foreground mb-3">Number of Rows to Create</p>
+                                        <div className="flex items-center gap-4">
+                                            <Input
+                                                type="number"
+                                                value={createRowCount}
+                                                onChange={(e) => setCreateRowCount(Math.max(1, Math.min(1000, parseInt(e.target.value) || 1)))}
+                                                className="w-24 bg-background"
+                                                min={1}
+                                                max={1000}
+                                            />
+                                            <span className="text-sm text-muted-foreground">
+                                                (Create between 1 and 1000 rows)
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <div className="flex gap-2 mt-4">
